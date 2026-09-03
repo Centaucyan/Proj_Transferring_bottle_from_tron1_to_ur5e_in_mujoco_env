@@ -11,13 +11,13 @@
 
 ## 목차 (Table of Contents)
 
-* [Milestone 0: Conda 가상환경과 ROS 2 Humble 런타임 바인딩 원리](#milestone-0-conda-가상환경과-ros-2-humble-런타임-바인딩-원리)
-* [Milestone 1: MuJoCo 물리 엔진과 멀티 로봇 통합 씬(Scene) 역학](#milestone-1-mujoco-물리-엔진과-멀티-로봇-통합-씬scene-역학)
-* [Milestone 2: ROS 2 - MuJoCo 비동기 브리지 및 통신 아키텍처](#milestone-2-ros-2---mujoco-비동기-브리지-및-통신-아키텍처)
-* [Milestone 3: 3D 비전 및 기하학적 중심점(Centroid) 추출 알고리즘](#milestone-3-3d-비전-및-기하학적-중심점centroid-추출-알고리즘)
-* [Milestone 4: 협동로봇(UR5e) 조작 및 MoveIt 2 모션 플래닝 원리](#milestone-4-협동로봇ur5e-조작-및-moveit-2-모션-플래닝-원리)
-* [Milestone 5: 이족 보행 로봇(Tron1) 제어 및 동적 인터락(Interlock)](#milestone-5-이족-보행-로봇tron1-제어-및-동적-인터락interlock)
-* [Milestone 6: Behavior Tree 기반 파이프라이닝 및 통합 오케스트레이션](#milestone-6-behavior-tree-기반-파이프라이닝-및-통합-오케스트레이션)
+* [Milestone 00: Conda 가상환경과 ROS 2 Humble 런타임 바인딩 원리](#milestone-00-conda-가상환경과-ros-2-humble-런타임-바인딩-원리)
+* [Milestone 01: MuJoCo 물리 엔진과 멀티 로봇 통합 씬(Scene) 역학](#milestone-01-mujoco-물리-엔진과-멀티-로봇-통합-씬scene-역학)
+* [Milestone 02: ROS 2 - MuJoCo 비동기 브리지 및 통신 아키텍처](#milestone-02-ros-2---mujoco-비동기-브리지-및-통신-아키텍처)
+* [Milestone 03: 3D 비전 및 기하학적 중심점(Centroid) 추출 알고리즘](#milestone-03-3d-비전-및-기하학적-중심점centroid-추출-알고리즘)
+* [Milestone 04: 협동로봇(UR5e) 조작 및 MoveIt 2 모션 플래닝 원리](#milestone-04-협동로봇ur5e-조작-및-moveit-2-모션-플래닝-원리)
+* [Milestone 05: 이족 보행 로봇(Tron1) 제어 및 동적 인터락(Interlock)](#milestone-05-이족-보행-로봇tron1-제어-및-동적-인터락interlock)
+* [Milestone 06: Behavior Tree 기반 파이프라이닝 및 통합 오케스트레이션](#milestone-06-behavior-tree-기반-파이프라이닝-및-통합-오케스트레이션)
 * [부록: 마일스톤별 권장 산출물 체크리스트](#마일스톤별-권장-산출물-체크리스트)
 
 ---
@@ -26,19 +26,19 @@
 
 ```mermaid
 flowchart TD
-    M0["[M0] Conda & ROS 2 런타임 바인딩 원리"] --> M1["[M1] MuJoCo 물리 엔진 & 멀티 로봇 통합 씬"]
-    M1 --> M2["[M2] ROS 2 - MuJoCo 통신 브리지 파이프라인"]
-    M2 --> M3["[M3] 3D 비전 & 기하학적 중심점(Centroid) 추출"]
-    M2 --> M4["[M4] MoveIt 2 모션 플래닝 & 정밀 파지 조작"]
-    M2 --> M5["[M5] 이족보행 Tron1 도킹 & 지지 안정화 제어"]
-    M3 --> M6["[M6] Behavior Tree 기반 파이프라이닝 & 통합 오케스트레이션"]
-    M4 --> M6
-    M5 --> M6
+    M00["[M00] Conda & ROS 2 런타임 바인딩 원리"] --> M01["[M01] MuJoCo 물리 엔진 & 멀티 로봇 통합 씬"]
+    M01 --> M02["[M02] ROS 2 - MuJoCo 통신 브리지 파이프라인"]
+    M02 --> M03["[M03] 3D 비전 & 기하학적 중심점(Centroid) 추출"]
+    M02 --> M04["[M04] MoveIt 2 모션 플래닝 & 정밀 파지 조작"]
+    M02 --> M05["[M05] 이족보행 Tron1 도킹 & 지지 안정화 제어"]
+    M03 --> M06["[M06] Behavior Tree 기반 파이프라이닝 & 통합 오케스트레이션"]
+    M04 --> M06
+    M05 --> M06
 ```
 
 ---
 
-## [Milestone 0] Conda 가상환경과 ROS 2 Humble 런타임 바인딩 원리
+## [Milestone 00] Conda 가상환경과 ROS 2 Humble 런타임 바인딩 원리
 
 ### 1. 학습 목표
 * Linux 시스템에서 공유 라이브러리(`*.so`)가 링커에 의해 동적으로 로드되는 원리를 이해한다.
@@ -64,7 +64,7 @@ flowchart TD
 
 ---
 
-## [Milestone 1] MuJoCo 물리 엔진과 멀티 로봇 통합 씬(Scene) 역학
+## [Milestone 01] MuJoCo 물리 엔진과 멀티 로봇 통합 씬(Scene) 역학
 
 ### 1. 학습 목표
 * MuJoCo의 볼록 다면체 접촉 역학(Convex Contact Dynamics)과 조인트 자유도(DoF) 모델링 원리를 이해한다.
@@ -94,7 +94,7 @@ flowchart TD
 
 ---
 
-## [Milestone 2] ROS 2 - MuJoCo 비동기 브리지 및 통신 아키텍처
+## [Milestone 02] ROS 2 - MuJoCo 비동기 브리지 및 통신 아키텍처
 
 ### 1. 학습 목표
 * 시뮬레이션의 동역학 적분 루프(Physics Loop)와 ROS 2의 비동기 이벤트 루프(Executor) 간의 동기화 원리를 학습한다.
@@ -125,7 +125,7 @@ flowchart TD
 
 ---
 
-## [Milestone 3] 3D 비전 및 기하학적 중심점(Centroid) 추출 알고리즘
+## [Milestone 03] 3D 비전 및 기하학적 중심점(Centroid) 추출 알고리즘
 
 ### 1. 학습 목표
 * 2D 이미지 좌표를 3D 공간 포인트로 변환하는 핀홀 카메라(Pin-hole Camera) 수학 모델을 이해한다.
@@ -160,7 +160,7 @@ flowchart TD
 
 ---
 
-## [Milestone 4] 협동로봇(UR5e) 조작 및 MoveIt 2 모션 플래닝 원리
+## [Milestone 04] 협동로봇(UR5e) 조작 및 MoveIt 2 모션 플래닝 원리
 
 ### 1. 학습 목표
 * 6자유도 매니퓰레이터의 정기구학(FK)과 역기구학(IK), OMPL 기반 경로 계획 알고리즘의 동작 원리를 이해한다.
@@ -191,7 +191,7 @@ flowchart TD
 
 ---
 
-## [Milestone 5] 이족 보행 로봇(Tron1) 제어 및 동적 인터락(Interlock)
+## [Milestone 05] 이족 보행 로봇(Tron1) 제어 및 동적 인터락(Interlock)
 
 ### 1. 학습 목표
 * 2족 보행 로봇의 질량 중심(CoM) 이동과 인계 구역 도킹 시의 자세 제어 원리를 이해한다.
@@ -222,7 +222,7 @@ flowchart TD
 
 ---
 
-## [Milestone 6] Behavior Tree 기반 파이프라이닝 및 통합 오케스트레이션
+## [Milestone 06] Behavior Tree 기반 파이프라이닝 및 통합 오케스트레이션
 
 ### 1. 학습 목표
 * 복잡한 멀티 로봇 비동기 제어를 단일 FSM보다 유연한 비헤이비어 트리(Behavior Tree) 구조로 모델링하는 원리를 체득한다.
@@ -261,10 +261,10 @@ flowchart TD
 
 | 마일스톤 | 핵심 학습 산출물 | 위치 및 파일명 |
 | :--- | :--- | :--- |
-| **M0** | 런타임 환경 검증 스크립트 | `scripts/check_env.py` |
-| **M1** | 통합 MuJoCo 씬 XML | `models/scene_integrated.xml` |
-| **M2** | ROS 2 - MuJoCo 브리지 노드 | `src/sim_bridge/mujoco_ros_bridge.py` |
-| **M3** | RANSAC & 클러스터링 비전 노드 | `src/vision/bottle_detector_3d.py` |
-| **M4** | MoveIt 2 기반 Pick-and-Place 노드 | `src/manipulation/ur5e_pick_place.py` |
-| **M5** | Tron1 도킹 및 Stance 제어 노드 | `src/locomotion/tron1_controller.py` |
-| **M6** | Behavior Tree 전체 통합 오케스트레이터 | `src/orchestration/bt_main_orchestrator.py` |
+| **M00** | 런타임 환경 검증 스크립트 | `scripts/check_env.py` |
+| **M01** | 통합 MuJoCo 씬 XML | `models/scene_integrated.xml` |
+| **M02** | ROS 2 - MuJoCo 브리지 노드 | `src/sim_bridge/mujoco_ros_bridge.py` |
+| **M03** | RANSAC & 클러스터링 비전 노드 | `src/vision/bottle_detector_3d.py` |
+| **M04** | MoveIt 2 기반 Pick-and-Place 노드 | `src/manipulation/ur5e_pick_place.py` |
+| **M05** | Tron1 도킹 및 Stance 제어 노드 | `src/locomotion/tron1_controller.py` |
+| **M06** | Behavior Tree 전체 통합 오케스트레이터 | `src/orchestration/bt_main_orchestrator.py` |
