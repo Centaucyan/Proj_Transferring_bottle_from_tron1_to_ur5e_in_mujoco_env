@@ -92,13 +92,13 @@ flowchart TD
 
 ### [U00] 단위 검증 샌드박스 공통 환경 및 모델 로더 검증
 * **목표:** 개별 단위 씬들이 공통으로 참조할 바닥 평면, 광원, 카메라, 기본 물리 파라미터를 규격화하고, Python에서 MuJoCo 모델을 안전하게 로드·렌더링하는 기본 검증 파이프라인 수립.
-* **사용 씬:** `models/units/scene_unit_base.xml`
+* **사용 씬:** `unit_test_models/phase01_u00_scene_unit_base.xml`
 * **검증 내용:**
   1. 공통 물리 옵션(중력, 고정 시간 간격 $dt=0.002s$) 정의 및 로드 테스트.
   2. 대화형 Viewer(`mujoco-python-viewer`) 및 Headless 렌더러 동작 확인.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u00_sandbox_env.md`
-  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u00_base_sandbox.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/phase01_u00_test_base_sandbox.py`
 
 ---
 
@@ -355,7 +355,7 @@ flowchart TD
 | 단계 (Phase) | 세부 단위 (Unit) | 핵심 작업 및 목표 | 상세 가이드 파일 (.md) | 주요 실행 산출물 |
 | :---: | :---: | :--- | :--- | :--- |
 | **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `scripts_devel_roadmap/phase00_check_env.py` |
-| **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `models/units/scene_unit_base.xml` |
+| **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `unit_test_models/phase01_u00_scene_unit_base.xml`<br>`scripts_devel_roadmap/phase01_u00_test_base_sandbox.py` |
 |  | **U01** | Tron1 기본 이족보행 및 도킹 정지 단독 검증 | `documents/development_roadmap/rm_phase01_u01_tron1_walking.md` | `models/units/scene_unit_tron1.xml` |
 |  | **U02** | Tron1 컵홀더 트레이 장착 & 물병 적재 운반 검증 | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `models/units/scene_unit_tron1_payload.xml` |
 |  | **U03** | D435i 3D 비전 인식 및 기하학적 중심점 추출 | `documents/development_roadmap/rm_phase01_u03_vision_centroid.md` | `models/units/scene_unit_vision.xml` |

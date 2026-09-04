@@ -709,10 +709,10 @@ Phase 00: Environment & CXXABI Runtime Binding Diagnostic Tool
 ============================================================
 
 [CHECK 1] Python Runtime Verification
-  * Python Executable: /home/korit/miniconda3/envs/transfer_bottle_by_tron1_py3_10/bin/python
+  * Python Executable: /home/user/miniconda3/envs/transfer_bottle_by_tron1_py3_10/bin/python
   * Python Version   : 3.10.16
   ✓ Python 3.10.x 일치 확인 (ROS 2 Humble 호환) [PASS]
-  ✓ Conda 환경 활성화 확인: /home/korit/miniconda3/envs/transfer_bottle_by_tron1_py3_10 [PASS]
+  ✓ Conda 환경 활성화 확인: /home/user/miniconda3/envs/transfer_bottle_by_tron1_py3_10 [PASS]
 
 [CHECK 2] ROS 2 Humble Environment Verification
   * ROS_DISTRO       : humble

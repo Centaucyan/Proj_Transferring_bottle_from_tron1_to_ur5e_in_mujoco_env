@@ -1,0 +1,80 @@
+<mujoco model="unit_sandbox_base">
+  <!-- 
+    ====================================================================
+    Phase 01-U00: 단위 검증 샌드박스 공통 표준 베이스 씬
+    - 이 씬은 모든 단위 테스트(U01~U05)의 물리 파라미터 및 환경 표준 기준선입니다.
+    ====================================================================
+  -->
+  
+  <!-- 1. 컴파일러 설정: 각도 라디안 표준, AABB 바운딩 박스 자동 피팅 -->
+  <compiler angle="radian" coordinate="local" autolimits="true" />
+
+  <!-- 2. 전역 물리 옵션 (황금 표준):
+       - timestep: 0.002초 (500Hz) - 고속 보행 충격 및 접촉 계산에 필수
+       - gravity: [0, 0, -9.81] m/s^2 표준 중력
+       - integrator: implicitfast (음함수 고속 적분기: 고게인 PD 제어 진동 억제)
+       - cone: elliptic (타원형 마찰 원뿔: 미끄러짐 마찰력의 정밀한 물리 모사)
+  -->
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic">
+    <flag contact="enable" />
+  </option>
+
+  <!-- 3. 시각화 및 오프스크린 기본 해상도 (D435i 센서 표준: 640x480) -->
+  <visual>
+    <global offwidth="640" offheight="480" azimuth="120" elevation="-20" />
+    <quality shadowsize="2048" offsamples="4" />
+    <map force="0.1" zfar="30" />
+  </visual>
+
+  <!-- 4. 공통 텍스처 및 재질 (바닥 체커보드 그리드) -->
+  <asset>
+    <!-- 하늘 배경 (Skybox) -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512" />
+    
+    <!-- 바닥 체크 패턴 (1m x 1m 격자 눈금선: 이동 거리 시각적 식별용) -->
+    <texture name="texplane" type="2d" builtin="checker" rgb1="0.2 0.25 0.3" rgb2="0.3 0.35 0.4"
+             width="512" height="512" mark="cross" markrgb="0.8 0.8 0.8" />
+    <material name="matplane" texture="texplane" texrepeat="5 5" texuniform="true" reflectance="0.1" />
+
+    <!-- 물리 검증용 테스트 물체 재질 -->
+    <material name="test_red" rgba="0.9 0.2 0.2 1.0" specular="0.5" shininess="0.5" />
+  </asset>
+
+  <!-- 5. 기본 클래스 정의 (Visual vs Collision 분리 규격) -->
+  <default>
+    <!-- 시각 전용 (충돌 없음, 카메라/뷰어 전용) -->
+    <default class="visual">
+      <geom contype="0" conaffinity="0" group="2" />
+    </default>
+    <!-- 충돌 전용 (물리 법칙 적용, 그룹 3) -->
+    <default class="collision">
+      <geom contype="1" conaffinity="1" group="3" friction="1.0 0.005 0.0001" />
+    </default>
+  </default>
+
+  <!-- 6. 월드 바디: 기준 바닥, 광원, 관찰 카메라, 물리 테스트 구체 -->
+  <worldbody>
+    <!-- 주 광원 (그림자 포함 상단 조명) -->
+    <light directional="true" pos="0 0 4" dir="0 0 -1" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" castshadow="true" />
+    <!-- 보조 광원 (입체감 보조) -->
+    <light directional="false" pos="3 -3 3" dir="-1 1 -1" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" />
+
+    <!-- 기준 바닥 평면 (무한 평면, 0.1m 두께 가상 바닥) -->
+    <geom name="floor" type="plane" size="0 0 0.05" material="matplane"
+          contype="1" conaffinity="1" friction="1.0 0.005 0.0001" condim="3" />
+
+    <!-- 공통 관찰 카메라 (전체 샌드박스 조망 뷰) -->
+    <camera name="overview_cam" pos="1.8 -2.2 1.6" xyaxes="0.78 0.62 0.0 -0.28 0.35 0.89" fovy="45" />
+
+    <!-- 
+      [물리 검증용 테스트 강체]
+      - 높이 z = 1.0m에 정지 상태로 배치된 1kg짜리 빨간 구체
+      - 자유낙하 수치 적분(h = 1/2 * g * t^2)이 이론값과 오차 없이 일치하는지 자동 검증하는 용도
+    -->
+    <body name="test_ball" pos="0 0 1.0">
+      <freejoint name="test_ball_joint" />
+      <inertial pos="0 0 0" mass="1.0" diaginertia="0.001 0.001 0.001" />
+      <geom name="test_ball_geom" type="sphere" size="0.05" material="test_red" class="collision" />
+    </body>
+  </worldbody>
+</mujoco>
