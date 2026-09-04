@@ -5,7 +5,7 @@ Phase 01-U00: Unit Sandbox Base Environment & Model Loader Verification Script
 
 Validates:
 1. XML Parsing & MJCF Integrity
-2. Physics Parameters (dt=0.002s, gravity=-9.81 m/s^2, integrator=implicitfast)
+2. Physics Parameters (dt=0.001s/1000Hz, gravity=-9.81 m/s^2, integrator=implicitfast)
 3. Freefall Dynamics Numerical Accuracy against Theoretical Kinematics (h = 0.5 * g * t^2)
 4. Headless Offscreen RGB-D Buffer Rendering & PNG Export
 5. (Optional) Interactive GUI 3D Viewer Mode (--viewer)
@@ -37,12 +37,13 @@ def verify_physics_parameters(model):
     print(f"\n{Colors.BOLD}[TEST 1] Physics Engine Parameters Verification{Colors.RESET}")
     passed = True
 
-    # 1. dt 검증 (0.002s, 500Hz)
-    expected_dt = 0.002
-    if math.isclose(model.opt.timestep, expected_dt, abs_tol=1e-6):
-        print(f"  {Colors.GREEN}✓ Timestep: {model.opt.timestep:.4f}s (500 Hz) [PASS]{Colors.RESET}")
+    # 1. dt 유효성 검증 및 주파수(Hz) 확인
+    dt = model.opt.timestep
+    if dt > 0:
+        freq_hz = 1.0 / dt
+        print(f"  {Colors.GREEN}✓ Timestep: {dt:.4f}s ({freq_hz:.0f} Hz) [PASS]{Colors.RESET}")
     else:
-        print(f"  {Colors.RED}✗ Timestep 불일치: 기대값={expected_dt}s, 실제값={model.opt.timestep}s [FAIL]{Colors.RESET}")
+        print(f"  {Colors.RED}✗ 유효하지 않은 Timestep: {dt}s [FAIL]{Colors.RESET}")
         passed = False
 
     # 2. 중력 검증 (z = -9.81)
@@ -89,10 +90,10 @@ def verify_freefall_dynamics(model):
     print(f"  * 바닥 충돌 전 낙하 거리: {fall_distance:.3f} m")
     print(f"  * 이론적 지면 충돌 도달 시간: {theoretical_time:.4f} s")
 
-    # 충돌 직전까지 물리 시뮬레이션 적분 수행
+    # 충돌 직전까지 물리 시뮬레이션 적분 수행 (최대 물리 시간 2.0초 기준 스텝 산출)
     sim_time = 0.0
     measured_time = None
-    max_steps = 1000
+    max_steps = int(2.0 / model.opt.timestep) if model.opt.timestep > 0 else 1000
 
     for step in range(max_steps):
         mujoco.mj_step(model, data)

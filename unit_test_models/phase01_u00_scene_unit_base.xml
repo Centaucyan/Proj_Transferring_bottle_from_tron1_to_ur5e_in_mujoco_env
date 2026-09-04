@@ -9,13 +9,13 @@
   <!-- 1. 컴파일러 설정: 각도 라디안 표준, AABB 바운딩 박스 자동 피팅 -->
   <compiler angle="radian" coordinate="local" autolimits="true" />
 
-  <!-- 2. 전역 물리 옵션 (황금 표준):
-       - timestep: 0.002초 (500Hz) - 고속 보행 충격 및 접촉 계산에 필수
+  <!-- 2. 전역 물리 옵션:
+       - timestep: 0.001초 (1000Hz) - 고속 보행 충격 및 접촉 계산의 정밀도 향상
        - gravity: [0, 0, -9.81] m/s^2 표준 중력
        - integrator: implicitfast (음함수 고속 적분기: 고게인 PD 제어 진동 억제)
        - cone: elliptic (타원형 마찰 원뿔: 미끄러짐 마찰력의 정밀한 물리 모사)
   -->
-  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic">
+  <option timestep="0.001" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic">
     <flag contact="enable" />
   </option>
 
