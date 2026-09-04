@@ -150,7 +150,7 @@ conda activate transfer_bottle_by_tron1_py3_10
 > * **1단계 (진단):** ROS 2 소싱 후 Phase 00 환경 진단 스크립트를 실행합니다.
 >   ```bash
 >   source /opt/ros/humble/setup.bash
->   python check_scripts/check_env.py
+>   python scripts_devel_roadmap/phase00_check_env.py
 >   ```
 > * **2단계 (조치):** 진단 결과에 따라 다음과 같이 조치합니다.
 >   * **정상 (`OK`):** 라이브러리가 호환되므로 추가 조치 없이 바로 **6.3절**로 진행합니다.
@@ -202,5 +202,5 @@ python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy sci
 ```bash
 python -c "import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; print('✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!')"
 ```
-*(보다 심층적인 CXXABI 심볼 진단 및 오프스크린 렌더링 검사는 Phase 00의 `check_scripts/check_env.py`를 통해 진행합니다.)*
+*(보다 심층적인 CXXABI 심볼 진단 및 오프스크린 렌더링 검사는 Phase 00의 `scripts_devel_roadmap/phase00_check_env.py`를 통해 진행합니다.)*
 

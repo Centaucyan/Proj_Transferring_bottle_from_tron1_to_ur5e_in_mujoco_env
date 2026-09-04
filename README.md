@@ -98,7 +98,7 @@ conda activate transfer_bottle_by_tron1_py3_10
 > * **1단계 (진단):** ROS 2 소싱 후 Phase 00 환경 진단 스크립트를 실행합니다.
 >   ```bash
 >   source /opt/ros/humble/setup.bash
->   python check_scripts/check_env.py
+>   python scripts_devel_roadmap/phase00_check_env.py
 >   ```
 > * **2단계 (조치):** 진단 결과에 따라 다음과 같이 조치합니다.
 >   * **정상 (`OK`):** 아무 조치도 필요 없으므로 바로 **3.3절**로 진행합니다.

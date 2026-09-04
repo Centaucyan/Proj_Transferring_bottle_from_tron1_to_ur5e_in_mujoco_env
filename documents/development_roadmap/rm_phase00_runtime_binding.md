@@ -25,8 +25,8 @@
    * [Step 3: ldd & strings 명령어로 공유 라이브러리 및 심볼 분석](#step-3-ldd--strings-명령어로-공유-라이브러리-및-심볼-분석)
    * [Step 4: 핵심 라이브러리 설치 및 임포트 테스트](#step-4-핵심-라이브러리-설치-및-임포트-테스트)
    * [Step 5: 충돌 발생 시 상황별 2대 해결 전략 실습](#step-5-충돌-발생-시-상황별-2대-해결-전략-실습)
-4. [자동화 진단 도구 (check_scripts/check_env.py) 활용 가이드](#4-자동화-진단-도구-check_scriptscheck_envpy-활용-가이드)
-   * [4.1. 진단 스크립트 작성 및 코드 학습 (check_scripts/check_env.py 전체 소스 코드)](#41-진단-스크립트-작성-및-코드-학습-check_scriptscheck_envpy-전체-소스-코드)
+4. [자동화 진단 도구 (scripts_devel_roadmap/phase00_check_env.py) 활용 가이드](#4-자동화-진단-도구-scripts_devel_roadmapphase00_check_envpy-활용-가이드)
+   * [4.1. 진단 스크립트 작성 및 코드 학습 (scripts_devel_roadmap/phase00_check_env.py 전체 소스 코드)](#41-진단-스크립트-작성-및-코드-학습-scripts_devel_roadmapphase00_check_envpy-전체-소스-코드)
    * [4.2. 스크립트 실행 방법](#42-스크립트-실행-방법)
    * [4.3. 주요 검사 항목 및 정상 출력 예시](#43-주요-검사-항목-및-정상-출력-예시)
 5. [트러블슈팅 가이드 (자주 겪는 에러 및 즉각 조치법)](#5-트러블슈팅-가이드-자주-겪는-에러-및-즉각-조치법)
@@ -430,33 +430,33 @@ ls -la libstdc++.so.6
 
 ---
 
-## 4. 자동화 진단 도구 (`check_scripts/check_env.py`) 활용 가이드
+## 4. 자동화 진단 도구 (`scripts_devel_roadmap/phase00_check_env.py`) 활용 가이드
 
-위에서 수행한 모든 진단 과정(파이썬 버전, ROS 2 환경변수, GLIBCXX 심볼 버전, 패키지 순차 임포트, MuJoCo 오프스크린 렌더링)을 하나의 스크립트로 자동 검증할 수 있도록 `check_scripts/check_env.py`를 직접 생성하고 실행합니다.
+위에서 수행한 모든 진단 과정(파이썬 버전, ROS 2 환경변수, GLIBCXX 심볼 버전, 패키지 순차 임포트, MuJoCo 오프스크린 렌더링)을 하나의 스크립트로 자동 검증할 수 있도록 `scripts_devel_roadmap/phase00_check_env.py`를 직접 생성하고 실행합니다.
 
 > [!TIP]
 > **직접 스크립트를 작성하며 원리 학습하기:**  
 > 본 프로젝트에서는 단순히 스크립트를 실행만 하는 것이 아니라, 각 진단 단계가 어떤 시스템 콜과 파이썬 내부 메커니즘(`sys`, `os`, `subprocess`, `ctypes`)을 활용하여 이기종 런타임을 검증하는지 직접 디렉토리와 파일을 생성하고 코드를 작성하며 학습하는 것을 권장합니다.
 
-### 4.1. 진단 스크립트 작성 및 코드 학습 (`check_scripts/check_env.py` 전체 소스 코드)
+### 4.1. 진단 스크립트 작성 및 코드 학습 (`scripts_devel_roadmap/phase00_check_env.py` 전체 소스 코드)
 
-진단 스크립트를 관리할 `check_scripts/` 디렉토리를 생성하고 `check_env.py` 파일을 생성하여 실행 권한을 부여합니다:
+진단 스크립트를 관리할 `scripts_devel_roadmap/` 디렉토리를 생성하고 `phase00_check_env.py` 파일을 생성하여 실행 권한을 부여합니다:
 
 ```bash
 # 1. 스크립트 디렉토리 생성
-mkdir -p check_scripts
+mkdir -p scripts_devel_roadmap
 
-# 2. check_env.py 파일 생성 및 실행 권한 부여
-touch check_scripts/check_env.py
-chmod +x check_scripts/check_env.py
+# 2. phase00_check_env.py 파일 생성 및 실행 권한 부여
+touch scripts_devel_roadmap/phase00_check_env.py
+chmod +x scripts_devel_roadmap/phase00_check_env.py
 ```
 
-생성한 `check_scripts/check_env.py`에 아래의 전체 소스 코드를 작성합니다:
+생성한 `scripts_devel_roadmap/phase00_check_env.py`에 아래의 전체 소스 코드를 작성합니다:
 
 ```python
 #!/usr/bin/env python3
 """
-check_scripts/check_env.py
+scripts_devel_roadmap/phase00_check_env.py
 Phase 00 Automated Environment Verification Script
 Validates:
 1. Python Runtime (3.10.x in Conda environment)
@@ -692,7 +692,7 @@ source /opt/ros/humble/setup.bash
 python -m pip install pydot
 
 # 4. 자동화 진단 스크립트 실행
-python check_scripts/check_env.py
+python scripts_devel_roadmap/phase00_check_env.py
 ```
 
 ### 4.3. 주요 검사 항목 및 정상 출력 예시
@@ -794,6 +794,6 @@ Phase 01(기능별 단위 샌드박스 검증)로 넘어가기 전, 아래 항�
 - [ ] `source /opt/ros/humble/setup.bash`가 정상 로드되어 ROS 2 환경변수가 활성화되는가?
 - [ ] 시스템과 가상환경의 `libstdc++.so.6`가 CXXABI 충돌 없이 상호 호환되는가?
 - [ ] `rclpy`, `mujoco`, `open3d`, `cv2`, `tf2_ros`, `py_trees`가 오류 없이 순차 임포트되는가?
-- [ ] `python check_scripts/check_env.py`를 실행하여 모든 항목이 `[PASS]`를 기록하는가?
+- [ ] `python scripts_devel_roadmap/phase00_check_env.py`를 실행하여 모든 항목이 `[PASS]`를 기록하는가?
 
 위 체크리스트가 모두 완료되면, 다음 단계인 **[Phase 01: 기능별 단위 샌드박스 검증 (Unit Sandbox Verification)]**의 U00 단계로 진입할 준비가 끝납니다.

@@ -80,7 +80,7 @@ flowchart TD
 
 ### 4. 산출물
 * 상세 가이드 문서: `documents/development_roadmap/rm_phase00_runtime_binding.md`
-* 검증 스크립트: `check_scripts/check_env.py`
+* 검증 스크립트: `scripts_devel_roadmap/phase00_check_env.py`
 
 ---
 
@@ -98,7 +98,7 @@ flowchart TD
   2. 대화형 Viewer(`mujoco-python-viewer`) 및 Headless 렌더러 동작 확인.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u00_sandbox_env.md`
-  * 테스트 스크립트: `scripts/units/test_u00_base_sandbox.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u00_base_sandbox.py`
 
 ---
 
@@ -115,7 +115,7 @@ flowchart TD
 * **성공 기준:** 목표 반경 ±5cm 이내 도달, 정지 후 롤/피치 진동 0.05 rad 이하 수렴.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u01_tron1_walking.md`
-  * 테스트 스크립트: `scripts/units/test_u01_tron1_walking.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u01_tron1_walking.py`
 
 ---
 
@@ -133,7 +133,7 @@ flowchart TD
 * **성공 기준:** 보행 운반 중 물병 낙하 0건, 인계 구역 트레이 높이 오차 ±1cm 이내, 정지 3초 후 트레이 진동 속도 0.01 m/s 이하 수렴.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md`
-  * 테스트 스크립트: `scripts/units/test_u02_tron1_payload_transport.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u02_tron1_payload_transport.py`
 
 ---
 
@@ -153,7 +153,7 @@ flowchart TD
 * **성공 기준:** 물병 참값 중심 좌표와 비전 추정 좌표 간 오차 **±5mm 이내**.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u03_vision_centroid.md`
-  * 테스트 스크립트: `scripts/units/test_u03_vision_centroid.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u03_vision_centroid.py`
 
 ---
 
@@ -172,7 +172,7 @@ flowchart TD
 * **성공 기준:** 리프트 완료 후 3초간 병이 그리퍼에서 미끄러지지 않고 공중에 고정 유지.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u04_arm_pick_lift.md`
-  * 테스트 스크립트: `scripts/units/test_u04_arm_pick_lift.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u04_arm_pick_lift.py`
 
 ---
 
@@ -189,7 +189,7 @@ flowchart TD
 * **성공 기준:** 물병이 쓰러지지 않고 수직 직립 상태를 유지하며, 그리퍼가 안전 구역으로 복귀.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u05_arm_place.md`
-  * 테스트 스크립트: `scripts/units/test_u05_arm_place.py`
+  * 테스트 스크립트: `scripts_devel_roadmap/units/test_u05_arm_place.py`
 
 ---
 
@@ -217,7 +217,7 @@ flowchart TD
 ### 4. 산출물
 * 상세 가이드: `documents/development_roadmap/rm_phase02_integrated_scene.md`
 * 통합 씬 파일: `models/scene_integrated.xml`
-* 뷰어 스크립트: `scripts/view_integrated_scene.py`
+* 뷰어 스크립트: `scripts_devel_roadmap/view_integrated_scene.py`
 
 ---
 
@@ -354,7 +354,7 @@ flowchart TD
 
 | 단계 (Phase) | 세부 단위 (Unit) | 핵심 작업 및 목표 | 상세 가이드 파일 (.md) | 주요 실행 산출물 |
 | :---: | :---: | :--- | :--- | :--- |
-| **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `check_scripts/check_env.py` |
+| **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `scripts_devel_roadmap/phase00_check_env.py` |
 | **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `models/units/scene_unit_base.xml` |
 |  | **U01** | Tron1 기본 이족보행 및 도킹 정지 단독 검증 | `documents/development_roadmap/rm_phase01_u01_tron1_walking.md` | `models/units/scene_unit_tron1.xml` |
 |  | **U02** | Tron1 컵홀더 트레이 장착 & 물병 적재 운반 검증 | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `models/units/scene_unit_tron1_payload.xml` |

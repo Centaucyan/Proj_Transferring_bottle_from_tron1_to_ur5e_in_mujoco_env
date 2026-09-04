@@ -261,7 +261,7 @@ flowchart TD
 
 | 마일스톤 | 핵심 학습 산출물 | 위치 및 파일명 |
 | :--- | :--- | :--- |
-| **M00** | 런타임 환경 검증 스크립트 | `scripts/check_env.py` |
+| **M00** | 런타임 환경 검증 스크립트 | `scripts_devel_roadmap/phase00_check_env.py` |
 | **M01** | 통합 MuJoCo 씬 XML | `models/scene_integrated.xml` |
 | **M02** | ROS 2 - MuJoCo 브리지 노드 | `src/sim_bridge/mujoco_ros_bridge.py` |
 | **M03** | RANSAC & 클러스터링 비전 노드 | `src/vision/bottle_detector_3d.py` |

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_scripts/check_env.py
+scripts_devel_roadmap/phase00_check_env.py
 Phase 00 Automated Environment Verification Script
 Validates:
 1. Python Runtime (3.10.x in Conda environment)
