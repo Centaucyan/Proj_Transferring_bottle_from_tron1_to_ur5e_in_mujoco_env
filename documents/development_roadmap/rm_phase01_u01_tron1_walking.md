@@ -224,13 +224,13 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
 
   <!-- 4. 공통 에셋 (바닥 격자 텍스처 및 로봇 3D STL 메쉬) -->
   <asset>
-    <!-- 하늘 배경 -->
+    <!-- [U00 베이스 환경 상속] 하늘 배경 (Skybox) -->
     <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
 
-    <!-- 바닥 체크 패턴 (1m 격자: 로봇 보행 거리 시각 측정용) -->
-    <texture name="texplane" type="2d" builtin="checker" rgb1="0.25 0.28 0.32" rgb2="0.35 0.38 0.42"
+    <!-- [U00 베이스 환경 상속] 바닥 체크 패턴 (1m x 1m 격자 눈금선: 이동 거리 시각적 식별용) -->
+    <texture name="texplane" type="2d" builtin="checker" rgb1="0.2 0.25 0.3" rgb2="0.3 0.35 0.4"
              width="512" height="512" mark="cross" markrgb="0.8 0.8 0.8"/>
-    <material name="matplane" texture="texplane" texrepeat="2 2" texuniform="true" reflectance="0.1"/>
+    <material name="matplane" texture="texplane" texrepeat="5 5" texuniform="true" reflectance="0.1"/>
 
     <!-- Tron1 STL 3D 메쉬 에셋 -->
     <mesh name="base_Link" file="base_Link.STL"/>

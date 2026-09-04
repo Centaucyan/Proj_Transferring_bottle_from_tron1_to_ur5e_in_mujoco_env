@@ -164,12 +164,17 @@ def verify_offscreen_rendering(model):
 def run_interactive_viewer(model):
     print(f"\n{Colors.BOLD}[INTERACTIVE MODE] Launching 3D MuJoCo Viewer...{Colors.RESET}")
     print(f"  * 마우스 좌클릭: 뷰 회전 | 우클릭: 뷰 이동 | 스크롤: 줌")
+    print(f"  * Space 바: 시뮬레이션 일시정지/재개 | Backspace: 초기 상태(공중 1.0m) 리셋")
+    print(f"  * 붉은 구체(test_ball, 지름 10cm)가 공중 1.0m에서 바닥으로 낙하하는 물리 현상을 관찰할 수 있습니다.")
     print(f"  * 창을 닫으면 프로그램이 종료됩니다.")
     
     try:
         import mujoco_viewer
         data = mujoco.MjData(model)
         viewer = mujoco_viewer.MujocoViewer(model, data)
+        # 모든 충돌/시각 그룹 활성화
+        viewer.opt.geomgroup[1] = 1
+        viewer.opt.geomgroup[3] = 1
         while viewer.is_alive:
             mujoco.mj_step(model, data)
             viewer.render()
@@ -180,6 +185,8 @@ def run_interactive_viewer(model):
         import mujoco.viewer
         data = mujoco.MjData(model)
         with mujoco.viewer.launch_passive(model, data) as viewer:
+            viewer.opt.geomgroup[1] = 1
+            viewer.opt.geomgroup[3] = 1
             while viewer.is_running():
                 mujoco.mj_step(model, data)
                 viewer.sync()

@@ -74,7 +74,7 @@
     <body name="test_ball" pos="0 0 1.0">
       <freejoint name="test_ball_joint" />
       <inertial pos="0 0 0" mass="1.0" diaginertia="0.001 0.001 0.001" />
-      <geom name="test_ball_geom" type="sphere" size="0.05" material="test_red" class="collision" />
+      <geom name="test_ball_geom" type="sphere" size="0.05" material="test_red" class="collision" group="1" />
     </body>
   </worldbody>
 </mujoco>

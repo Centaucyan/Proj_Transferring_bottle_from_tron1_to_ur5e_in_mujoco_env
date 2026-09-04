@@ -18,6 +18,7 @@
    * [2.3. 충돌 검출(Collision Detection)과 Geom 필터링 (contype/conaffinity)](#23-충돌-검출collision-detection과-geom-필터링-contypeconaffinity)
    * [2.4. Python MuJoCo의 양대 코어: MjModel(정적)과 MjData(동적)](#24-python-mujoco의-양대-코어-mjmodel정적과-mjdata동적)
    * [2.5. 렌더링 파이프라인: 인터랙티브 뷰어 vs 오프스크린 렌더러](#25-렌더링-파이프라인-인터랙티브-뷰어-vs-오프스크린-렌더러)
+   * [2.6. 물리 0점 조절용 자유낙하 검증체(test_ball)와 Geom 그룹 메커니즘](#26-물리-0점-조절용-자유낙하-검증체test_ball와-geom-그룹-메커니즘)
 3. [단계별 실습: 내 손으로 직접 만들고 검증하기](#3-단계별-실습-내-손으로-직접-만들고-검증하기)
    * [Step 1: 디렉토리 구조 생성](#step-1-디렉토리-구조-생성)
    * [Step 2: 공통 단위 샌드박스 씬 (unit_test_models/phase01_u00_scene_unit_base.xml) 작성](#step-2-공통-단위-샌드박스-씬-unit_test_modelsphase01_u00_scene_unit_basexml-작성)
@@ -173,7 +174,30 @@ flowchart TD
    * 마우스 좌클릭(회전), 우클릭(이동), 휠 스크롤(줌)을 통해 로봇의 물리 동작을 **개발자(사람)가 실시간 3차원으로 관찰**할 수 있습니다.
 2. **오프스크린 렌더러 (`mujoco.Renderer`):**
    * 화면에 창을 띄우지 않고, 그래픽 카드(또는 CPU OSMesa)의 메모리 버퍼(FBO)에서 직접 **RGB 영상(`numpy.ndarray`, 480×640×3)과 Depth(거리) 영상(480×640)을 추출**합니다.
-   * **D435i 가상 카메라 센서(Phase 04)와 단위 검증(U03)**에서 비전 알고리즘이 처리할 센서 바이너리를 생성하는 핵심 엔진입니다.
+
+---
+
+### 2.6. 물리 0점 조절용 자유낙하 검증체(`test_ball`)와 Geom 그룹 메커니즘
+
+#### 💡 왜 마찰력이 아니라 "수치 적분기(Integrator)" 검증인가?
+많은 초심자들이 베이스 씬에 있는 빨간 구체(`test_ball`)를 보고 "지면 마찰력(Friction)을 테스트하기 위한 물체인가?"라고 오해합니다.  
+하지만 구체가 공중에서 바닥에 떨어지는 동안에는 지면과 전혀 접촉하지 않으므로 **접촉 마찰력은 0**입니다.
+
+이 구체의 진짜 목적은 **"물리 엔진의 영점 조절(캘리브레이션 추, Sanity Check)"**입니다:
+1. **순수 뉴턴 중력 가속도 이론값 검증:**
+   $$h = \frac{1}{2} g t^2 \quad \Longrightarrow \quad t_{\text{theory}} = \sqrt{\frac{2h}{g}}$$
+   * 높이 $z = 1.0\text{m}$, 구체 반지름 $r = 0.05\text{m}$ $\rightarrow$ 바닥 접촉 전 낙하 거리 $h = 0.95\text{m}$
+   * 표준 중력 $g = 9.81\text{m/s}^2$에서 이론적 도달 시간은 **정확히 $0.4402\text{초}$**입니다.
+2. **복잡한 로봇 탑재 전 '디버깅 지옥' 사전 차단:**
+   * 만약 Tron1 이족보행이나 UR5e 로봇팔을 올렸을 때 로봇이 넘어지거나 떨린다면, 이것이 제어기 알고리즘의 문제인지, 관절 게인의 문제인지, 물리 엔진의 타임스텝($dt$) 적분 오차인지 알 수 없습니다.
+   * 모터, 관절, 메쉬 간섭이 전혀 없는 **가장 순수한 1kg 단일 강체**를 떨어뜨려, 물리 엔진의 수치 적분 오차가 **$0.5\%$ 이내(합격)**임을 사전에 입증하는 절대 기준선을 제공합니다.
+
+#### 💡 MuJoCo 뷰어의 Geom Group 필터링 원리
+MuJoCo 뷰어는 화면을 렌더링할 때 깔끔한 그래픽을 위해 기본적으로 **Group 0, 1, 2(시각용 메쉬)만 화면에 켜고, Group 3, 4, 5(물리 충돌체 박스/구체/캡슐)는 기본적으로 화면에서 끕니다(OFF)**:
+* `class="collision"`으로만 선언하면 `default` 설정에 의해 자동으로 `group="3"`으로 분류되어 뷰어 실행 시 공이 눈에 보이지 않게 됩니다.
+* 따라서 뷰어에서 붉은 구체를 즉시 시각적으로 확인하려면:
+  1. **XML 태그 설정:** `<geom name="test_ball_geom" ... class="collision" group="1" />`과 같이 충돌 속성은 유지하되 `group="1"`을 명시하여 기본 시각 그룹에 포함시키거나,
+  2. **뷰어 런타임 조작:** 뷰어 실행 중 키보드 숫자 **`3`**번을 눌러 충돌체 렌더링을 토글(ON)할 수 있습니다.
 
 ---
 
@@ -282,7 +306,7 @@ mkdir -p unit_test_models
     <body name="test_ball" pos="0 0 1.0">
       <freejoint name="test_ball_joint" />
       <inertial pos="0 0 0" mass="1.0" diaginertia="0.001 0.001 0.001" />
-      <geom name="test_ball_geom" type="sphere" size="0.05" material="test_red" class="collision" />
+      <geom name="test_ball_geom" type="sphere" size="0.05" material="test_red" class="collision" group="1" />
     </body>
   </worldbody>
 </mujoco>
@@ -485,12 +509,17 @@ def verify_offscreen_rendering(model):
 def run_interactive_viewer(model):
     print(f"\n{Colors.BOLD}[INTERACTIVE MODE] Launching 3D MuJoCo Viewer...{Colors.RESET}")
     print(f"  * 마우스 좌클릭: 뷰 회전 | 우클릭: 뷰 이동 | 스크롤: 줌")
+    print(f"  * Space 바: 시뮬레이션 일시정지/재개 | Backspace: 초기 상태(공중 1.0m) 리셋")
+    print(f"  * 붉은 구체(test_ball, 지름 10cm)가 공중 1.0m에서 바닥으로 낙하하는 물리 현상을 관찰할 수 있습니다.")
     print(f"  * 창을 닫으면 프로그램이 종료됩니다.")
     
     try:
         import mujoco_viewer
         data = mujoco.MjData(model)
         viewer = mujoco_viewer.MujocoViewer(model, data)
+        # 모든 충돌/시각 그룹 활성화
+        viewer.opt.geomgroup[1] = 1
+        viewer.opt.geomgroup[3] = 1
         while viewer.is_alive:
             mujoco.mj_step(model, data)
             viewer.render()
@@ -501,6 +530,8 @@ def run_interactive_viewer(model):
         import mujoco.viewer
         data = mujoco.MjData(model)
         with mujoco.viewer.launch_passive(model, data) as viewer:
+            viewer.opt.geomgroup[1] = 1
+            viewer.opt.geomgroup[3] = 1
             while viewer.is_running():
                 mujoco.mj_step(model, data)
                 viewer.sync()
@@ -638,12 +669,21 @@ U00 Verification Summary
 python scripts_devel_roadmap/phase01_u00_test_base_sandbox.py --viewer
 ```
 
-* **마우스 조작법:**
+* **마우스 및 키보드 조작법:**
   * **좌클릭 드래그:** 카메라 시점 회전 (Orbit)
   * **우클릭 드래그:** 카메라 평행 이동 (Pan)
   * **마우스 휠 스크롤:** 카메라 줌 인 / 줌 아웃 (Zoom)
   * **스페이스바 (Space):** 시뮬레이션 일시정지 / 재생
   * **백스페이스 (Backspace):** 시뮬레이션 초기 상태로 리셋
+  * **숫자 3 키:** Collision Geom Group 3 토글 (충돌체 표시/숨김)
+
+> [!TIP]
+> **붉은 구체(`test_ball`)의 자유낙하 슬로우 관찰법:**  
+> 높이 1.0m에서 떨어지는 시간은 약 0.44초로 매우 짧기 때문에 뷰어가 켜지자마자 바닥에 닿아 있습니다.  
+> 1. **스페이스바(Space)**를 눌러 시뮬레이션을 일시정지합니다.  
+> 2. **백스페이스(Backspace)**를 누르면 구체가 다시 공중 1.0m 초기 높이로 리셋됩니다.  
+> 3. 다시 **스페이스바**를 누르면 구체가 중력을 받아 바닥으로 똑 떨어지는 물리 현상을 눈으로 똑똑히 관찰할 수 있습니다.  
+> *(구체가 안 보일 경우 키보드 숫자 **3**번을 누르면 충돌체 렌더링이 강제 활성화됩니다.)*
 
 ---
 
@@ -664,7 +704,14 @@ python scripts_devel_roadmap/phase01_u00_test_base_sandbox.py --viewer
 * **원인:** `temp` 폴더 생성 권한 부족.
 * **조치:** 프로젝트 루트에서 `mkdir -p temp && chmod 777 temp`를 실행합니다.
 
-### Q4. 자유낙하 오차율이 약 0.43% ~ 0.48%로 0.5% 기준선에 가깝게 측정됩니다. 원인과 오차를 0.05% 이하로 극적으로 줄이는 방법은 무엇인가요?
+### Q4. `--viewer` 실행 시 붉은 구체(`test_ball`)가 화면에 보이지 않습니다.
+* **원인:** MuJoCo 뷰어는 기본적으로 Group 0, 1, 2(시각용 메쉬)만 표시하고 Group 3, 4, 5(충돌체)는 화면에서 숨깁니다. 구체가 `class="collision"`으로만 지정되어 있으면 자동으로 Group 3으로 분류되어 숨겨집니다.
+* **조치:**
+  1. XML에서 충돌체 구체에 `group="1"` 속성을 명시합니다:
+     `<geom name="test_ball_geom" type="sphere" size="0.05" material="test_red" class="collision" group="1" />`
+  2. 또는 뷰어 창에서 키보드 숫자 **3**번을 누르거나 뷰어 메뉴의 `Rendering -> Geoms -> Group 3`을 켭니다.
+
+### Q5. 자유낙하 오차율이 약 0.43% ~ 0.48%로 0.5% 기준선에 가깝게 측정됩니다. 원인과 오차를 0.05% 이하로 극적으로 줄이는 방법은 무엇인가요?
 
 #### 1) 오차 발생의 근본 원인
 1. **시간 이산화 양자화 지연 (Time Quantization Latency):**
