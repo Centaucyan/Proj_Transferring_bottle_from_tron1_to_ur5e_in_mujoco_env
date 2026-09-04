@@ -80,7 +80,7 @@ flowchart TD
 
 ### 4. 산출물
 * 상세 가이드 문서: `documents/development_roadmap/rm_phase00_runtime_binding.md`
-* 검증 스크립트: `scripts/check_env.py`
+* 검증 스크립트: `check_scripts/check_env.py`
 
 ---
 
@@ -354,7 +354,7 @@ flowchart TD
 
 | 단계 (Phase) | 세부 단위 (Unit) | 핵심 작업 및 목표 | 상세 가이드 파일 (.md) | 주요 실행 산출물 |
 | :---: | :---: | :--- | :--- | :--- |
-| **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `scripts/check_env.py` |
+| **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `check_scripts/check_env.py` |
 | **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `models/units/scene_unit_base.xml` |
 |  | **U01** | Tron1 기본 이족보행 및 도킹 정지 단독 검증 | `documents/development_roadmap/rm_phase01_u01_tron1_walking.md` | `models/units/scene_unit_tron1.xml` |
 |  | **U02** | Tron1 컵홀더 트레이 장착 & 물병 적재 운반 검증 | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `models/units/scene_unit_tron1_payload.xml` |
