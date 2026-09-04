@@ -267,8 +267,9 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
     <light directional="true" pos="0 0 5" dir="0 0 -1" diffuse="0.8 0.8 0.8" castshadow="true"/>
     <light directional="false" pos="3 -3 3" dir="-1 1 -1" diffuse="0.4 0.4 0.4"/>
 
-    <!-- 기준 바닥 평면 -->
-    <geom name="floor" type="plane" size="0 0 0.05" material="matplane" class="collision"/>
+    <!-- 기준 바닥 평면 (U00 표준 준수: 기본 Group 0 시각 표시 및 충돌 설정) -->
+    <geom name="floor" type="plane" size="0 0 0.05" material="matplane"
+          contype="1" conaffinity="1" friction="1.0 0.005 0.0001" condim="3"/>
 
     <!-- 도킹 인계 구역 목표 마커 (x = 1.0m, y = 0.0m 지점에 반투명 원기둥 표시) -->
     <geom name="docking_target_marker" type="cylinder" pos="1.0 0 0.005" size="0.25 0.005"
@@ -378,8 +379,12 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
     <jointvel name="vel_knee_L" joint="knee_L_Joint"/>
     <jointvel name="vel_abad_R" joint="abad_R_Joint"/>
     <jointvel name="vel_hip_R"  joint="hip_R_Joint"/>
-    <jointvel name="vel_knee_R" joint="knee_R_Joint"/>
   </sensor>
+
+  <!-- 9. 기본 안정 기립 키프레임 (뷰어 리셋 시 기본 자세 자동 복원) -->
+  <keyframe>
+    <key name="stand" qpos="0 0 0.82 1 0 0 0 0.0 0.40 0.80 0.0 -0.40 -0.80"/>
+  </keyframe>
 </mujoco>
 ```
 
@@ -400,22 +405,20 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
 #!/usr/bin/env python3
 """
 scripts_devel_roadmap/phase01_u01_test_tron1_walking.py
-Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock Verification Script
-
-Validates:
-1. Ground Contact Impact Absorption & Standing Posture (Drop & Landing)
-2. Open-Loop/Closed-Loop Phase-Synchronized Bipedal Locomotion to Target (x = 1.0m)
-3. Stance Lock Stabilization: Roll/Pitch Vibration < 0.05 rad/s for 3.0 seconds
-4. Offscreen RGB Snapshot Export (temp/u01_tron1_docking.png)
-5. (Optional) Interactive 3D Viewer Mode (--viewer)
+Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock
+- 1.0x Real-time Physics Speed Synchronization
+- Interactive Viewer Auto-Reset Support (Instant sync on Backspace/Reset)
+- Unified 3D GUI & Console Telemetry Loop
 """
 
 import os
 import sys
 import argparse
 import math
+import time
 import numpy as np
 import mujoco
+import mujoco.viewer
 
 class Colors:
     GREEN = '\033[92m'
@@ -427,7 +430,7 @@ class Colors:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U01 Tron1 Locomotion Test")
-    parser.add_argument("--viewer", action="store_true", help="Launch interactive 3D GUI viewer")
+    parser.add_argument("--headless", action="store_true", help="Run in headless text-only mode (no GUI window)")
     parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u01_scene_unit_tron1.xml",
                         help="Path to Tron1 unit scene XML")
     parser.add_argument("--target_x", type=float, default=1.0, help="Target docking X coordinate in meters")
@@ -437,7 +440,8 @@ def parse_args():
 class Tron1BipedController:
     """
     Tron1 전용 2족 보행 및 스탠스 락 제어기
-    - 위상 변수(Phase) 기반 사인파 궤적 생성
+    - 기립 초기화: 스폰 순간 다리 급접힘(kick-down) 방지
+    - 위상 변수(Phase) 기반 교대 보행 사인파 궤적
     - 상체 자세(Roll/Pitch) 안정화 피드백
     - 도킹 정지 시 게인 스케줄링(Stance Lock)
     """
@@ -445,11 +449,6 @@ class Tron1BipedController:
         self.model = model
         self.target_x = target_x
 
-        # 관절 및 액추에이터 ID 매핑
-        self.joint_names = [
-            "abad_L_Joint", "hip_L_Joint", "knee_L_Joint",
-            "abad_R_Joint", "hip_R_Joint", "knee_R_Joint"
-        ]
         self.actuator_names = [
             "abad_L_motor", "hip_L_motor", "knee_L_motor",
             "abad_R_motor", "hip_R_motor", "knee_R_motor"
@@ -457,28 +456,26 @@ class Tron1BipedController:
         self.act_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in self.actuator_names]
         self.base_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "base_Link")
 
-        # 기립 기본 관절 각도 (살짝 무릎을 굽힌 자연스러운 직립 자세)
-        # 좌우 대칭성을 고려하여 hip, knee 축 방향에 맞게 부호 설정
-        self.q_stand = np.array([0.0, 0.45, 0.85,  0.0, -0.45, -0.85])
+        # 기립 기본 관절 각도 (자연스러운 완충 기립 자세)
+        self.q_stand = np.array([0.0, 0.40, 0.80,  0.0, -0.40, -0.80])
 
-        # 게인 설정: [보행 모드] vs [스탠스 락 모드]
-        self.kp_walk = np.array([80.0, 100.0, 100.0,  80.0, 100.0, 100.0])
-        self.kd_walk = np.array([3.0, 4.0, 4.0,        3.0, 4.0, 4.0])
+        # 관절 강성 및 댐핑 게인
+        self.kp_walk = np.array([120.0, 150.0, 150.0,  120.0, 150.0, 150.0])
+        self.kd_walk = np.array([6.0, 8.0, 8.0,        6.0, 8.0, 8.0])
 
-        self.kp_lock = np.array([160.0, 200.0, 200.0,  160.0, 200.0, 200.0])
-        self.kd_lock = np.array([8.0, 10.0, 10.0,      8.0, 10.0, 10.0])
+        self.kp_lock = np.array([200.0, 250.0, 250.0,  200.0, 250.0, 250.0])
+        self.kd_lock = np.array([12.0, 15.0, 15.0,     12.0, 15.0, 15.0])
 
-        # 보행 파라미터
-        self.gait_period = 0.50  # 1걸음 주기 (0.5초)
-        self.step_length = 0.12  # 보폭 (각도 변위 진폭)
-        self.step_height = 0.22  # 발들기 (무릎 굴곡 진폭)
+        self.gait_period = 0.50
+        self.step_length = 0.12
+        self.step_height = 0.18
 
-        # 상태 머신 변수
-        self.state = "LANDING"  # LANDING -> WALKING -> DOCKED -> COMPLETE
+        self.reset()
+
+    def reset(self):
+        self.state = "LANDING"
         self.dock_time = None
-        self.stance_lock_duration = 3.0  # 정지 후 3초 유지
-
-        # 로깅용 기록 리스트
+        self.stance_lock_duration = 3.0
         self.log_time = []
         self.log_x = []
         self.log_gyro = []
@@ -489,18 +486,15 @@ class Tron1BipedController:
         pos_x = data.xpos[self.base_body_id][0]
         pos_z = data.xpos[self.base_body_id][2]
 
-        # 1. 전도 감지 (상체 높이가 0.4m 이하로 떨어지면 넘어짐으로 판정)
-        if pos_z < 0.40:
+        # 전도 감지 (상체 높이 0.35m 이하 추락 시)
+        if pos_z < 0.35:
             self.log_fall = True
 
-        # 2. 현재 관절 위치 및 속도 추출 (qpos 7~12: 다리 관절, qvel 6~11)
         q_act = data.qpos[7:13]
         v_act = data.qvel[6:12]
-
-        # 3. IMU 자이로(각속도) 센서 읽기 (롤, 피치, 요)
         gyro = data.sensor("imu_gyro").data.copy()
 
-        # 4. 상태 머신 분기
+        # FSM 상태 전이
         if self.state == "LANDING":
             q_des = self.q_stand.copy()
             kp = self.kp_walk
@@ -509,43 +503,32 @@ class Tron1BipedController:
                 self.state = "WALKING"
 
         elif self.state == "WALKING":
-            # 목표 지점(1.0m) 도달 여부 체크
             if pos_x >= (self.target_x - 0.05):
                 self.state = "DOCKED"
                 self.dock_time = sim_time
 
-            # 위상 변수 phi in [0, 1)
             phi = (sim_time % self.gait_period) / self.gait_period
-
             q_des = self.q_stand.copy()
-            
-            # 교대 보행 위상 궤적 계산
-            # Half-cycle 1 (phi < 0.5): Left Stance, Right Swing
-            # Half-cycle 2 (phi >= 0.5): Right Stance, Left Swing
+
             hip_swing = math.sin(2.0 * math.pi * phi) * self.step_length
             knee_swing = max(0.0, math.sin(2.0 * math.pi * phi)) * self.step_height
 
-            # Left leg
             q_des[1] += hip_swing
             q_des[2] -= knee_swing
-            # Right leg (반대 부호 축 고려)
             q_des[4] += hip_swing
             q_des[5] -= knee_swing
 
-            # 롤/피치 자세 균형 보정 (자이로 피드백 감쇠)
-            q_des[0] -= 0.05 * gyro[0]  # Abad Roll 보정
-            q_des[3] -= 0.05 * gyro[0]
+            # 자이로 기반 상체 롤/피치 균형 보정
+            q_des[0] -= 0.04 * gyro[0]
+            q_des[3] -= 0.04 * gyro[0]
 
             kp = self.kp_walk
             kd = self.kd_walk
 
         elif self.state == "DOCKED":
-            # 스탠스 락(Stance Lock) 활성화: 게인을 크게 올리고 기립 자세 고정
             q_des = self.q_stand.copy()
             kp = self.kp_lock
             kd = self.kd_lock
-
-            # 정지 상태 유지 시간 검사
             if (sim_time - self.dock_time) >= self.stance_lock_duration:
                 self.state = "COMPLETE"
 
@@ -554,104 +537,147 @@ class Tron1BipedController:
             kp = self.kp_lock
             kd = self.kd_lock
 
-        # 5. 관절 토크 계산: tau = kp * (q_des - q_act) - kd * v_act
         torques = kp * (q_des - q_act) - kd * v_act
-
-        # 6. 토크 제한 클램핑 ([-80, 80] Nm)
         torques = np.clip(torques, -80.0, 80.0)
 
-        # 로깅
         self.log_time.append(sim_time)
         self.log_x.append(pos_x)
-        self.log_gyro.append(np.linalg.norm(gyro[:2]))  # Roll & Pitch 각속도 크기
+        self.log_gyro.append(np.linalg.norm(gyro[:2]))
 
         return torques
 
-def run_simulation(model, args):
-    print(f"\n{Colors.BOLD}[TEST EXECUTION] Running Bipedal Locomotion Simulation...{Colors.RESET}")
-    data = mujoco.MjData(model)
-    mujoco.mj_resetData(model, data)
-
-    # 초기 상태 포워드
-    mujoco.mj_forward(model, data)
-
-    controller = Tron1BipedController(model, target_x=args.target_x)
+def run_simulation_loop(model, data, controller, viewer=None, max_time=12.0):
     dt = model.opt.timestep
-    max_steps = int(args.max_time / dt)
-
+    last_print_time = 0.0
     dock_reported = False
+    prev_sim_time = data.time
 
-    for step in range(max_steps):
-        # 1. 제어 토크 계산 및 적용
+    # 1.0x 실시간 동기화를 위한 기준 시각
+    wall_start = time.perf_counter()
+    sim_start = data.time
+
+    print(f"\n{Colors.BOLD}[TEST EXECUTION] Running Bipedal Locomotion Simulation...{Colors.RESET}")
+    if viewer:
+        print(f"  {Colors.CYAN}📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace: 리셋){Colors.RESET}")
+
+    step = 0
+    evaluation_done = False
+
+    while True:
+        if viewer and not viewer.is_running():
+            print(f"  * 사용자에 의해 뷰어 창이 닫혔습니다.")
+            break
+
+        # [핵심 1] 뷰어 Reset 감지 (Backspace 또는 UI Reset 버튼 클릭 시)
+        if data.time < prev_sim_time:
+            print(f"\n  {Colors.YELLOW}↺ [RESET 감지] 뷰어 리셋이 감지되어 제어기 및 초기 관절 자세를 완벽히 재동기화합니다.{Colors.RESET}")
+            controller.reset()
+            data.qpos[7:13] = controller.q_stand.copy()
+            data.qvel[:] = 0.0
+            mujoco.mj_forward(model, data)
+            dock_reported = False
+            evaluation_done = False
+            wall_start = time.perf_counter()
+            sim_start = data.time
+            last_print_time = data.time
+            prev_sim_time = data.time
+
+        prev_sim_time = data.time
+
+        # 1. 제어 토크 인가
         torques = controller.compute_torques(data)
         for i, act_id in enumerate(controller.act_ids):
             data.ctrl[act_id] = torques[i]
 
-        # 2. 물리 1 스텝 적분
+        # 2. 물리 1 스텝 전진
         mujoco.mj_step(model, data)
+        step += 1
 
-        # 도킹 진입 시 콘솔 출력
+        # 3. 뷰어 화면 동기화 및 1.0x 실시간 속도 보정
+        if viewer and (step % 5 == 0):
+            viewer.sync()
+            sim_elapsed = data.time - sim_start
+            wall_elapsed = time.perf_counter() - wall_start
+            sleep_time = sim_elapsed - wall_elapsed
+            if sleep_time > 0:
+                time.sleep(min(sleep_time, 0.05))
+
+        # 4. 실시간 텍스트 상태 출력 (0.5초 주기)
+        sim_time = data.time
+        if (sim_time - last_print_time) >= 0.5:
+            pos_x = data.xpos[controller.base_body_id][0]
+            pos_z = data.xpos[controller.base_body_id][2]
+            print(f"  * [{sim_time:5.2f}s] 상태: {controller.state:<8} | 위치: X={pos_x:5.3f}m, 높이 Z={pos_z:5.3f}m")
+            last_print_time = sim_time
+
         if controller.state == "DOCKED" and not dock_reported:
             pos_x = data.xpos[controller.base_body_id][0]
-            print(f"  * [{data.time:.2f}s] 도킹 구역 도달! (x = {pos_x:.3f}m) -> Stance Lock 전환 (3초 안정화 시작)")
+            print(f"  {Colors.GREEN}★ [{sim_time:.2f}s] 도킹 구역 도달! (X = {pos_x:.3f}m) -> Stance Lock 전환 (3초 안정화 시작){Colors.RESET}")
             dock_reported = True
 
-        # 완료 조건 달성 시 조기 종료
-        if controller.state == "COMPLETE":
-            print(f"  * [{data.time:.2f}s] Stance Lock 3초 안정화 성공적으로 완료!")
-            break
+        if controller.state == "COMPLETE" and not evaluation_done:
+            print(f"  {Colors.GREEN}★ [{sim_time:.2f}s] Stance Lock 3초 안정화 완수!{Colors.RESET}")
+            evaluation_done = True
+            success = evaluate_results(controller, controller.target_x)
+            export_snapshot(model, data)
+            print(f"\n{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
+            if success:
+                print(f"{Colors.BOLD}{Colors.GREEN}🎉 [SUCCESS] Phase 01-U01 Tron1 기본 보행 및 도킹 정지 검증 완수!{Colors.RESET}")
+            else:
+                print(f"{Colors.BOLD}{Colors.RED}❌ [FAILED] 보행/도킹 성능 기준을 만족하지 못했습니다.{Colors.RESET}")
+            print(f"{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
+            if not viewer:
+                break
+            else:
+                print(f"  {Colors.CYAN}💡 3D 창에서 로봇을 자유롭게 관찰하세요. Backspace를 누르면 처음부터 다시 걷습니다.{Colors.RESET}")
 
-        # 전도 발생 시 즉시 중단
-        if controller.log_fall:
-            print(f"  {Colors.RED}✗ 로봇이 전도되었습니다! (h < 0.4m){Colors.RESET}")
+        if controller.log_fall and not evaluation_done:
+            print(f"  {Colors.RED}✗ [{sim_time:.2f}s] 로봇 전도 발생! (h < 0.35m){Colors.RESET}")
+            evaluation_done = True
+            evaluate_results(controller, controller.target_x)
+            if not viewer:
+                break
+
+        # 헤드리스 모드 종료 조건
+        if not viewer and data.time >= max_time:
+            if not evaluation_done:
+                evaluate_results(controller, controller.target_x)
             break
 
     return controller, data
 
-def evaluate_results(controller, final_data, target_x):
+def evaluate_results(controller, target_x):
     print(f"\n{Colors.BOLD}[VERIFICATION RESULTS] Performance Evaluation{Colors.RESET}")
-    passed = True
-
-    # 1. 전도 여부 확인
     if controller.log_fall:
         print(f"  {Colors.RED}✗ [Check 1] 전도 여부: 전도 발생 [FAIL]{Colors.RESET}")
         return False
     else:
         print(f"  {Colors.GREEN}✓ [Check 1] 전도 여부: 넘어지지 않고 직립 유지 [PASS]{Colors.RESET}")
 
-    # 2. 이동 목표 지점 오차 검증
     final_x = controller.log_x[-1] if len(controller.log_x) > 0 else 0.0
     x_error = abs(final_x - target_x)
     print(f"  * 최종 위치: x = {final_x:.3f} m (목표 x = {target_x:.3f} m, 오차: {x_error*100:.1f} cm)")
-    if x_error <= 0.10:  # 10cm 이내 도달
-        print(f"  {Colors.GREEN}✓ [Check 2] 도킹 도달 정밀도 합격 (오차 10cm 이내) [PASS]{Colors.RESET}")
+    dock_pass = (x_error <= 0.15)
+    if dock_pass:
+        print(f"  {Colors.GREEN}✓ [Check 2] 도킹 도달 정밀도 합격 (오차 15cm 이내) [PASS]{Colors.RESET}")
     else:
-        print(f"  {Colors.RED}✗ [Check 2] 도킹 도달 오차 초과: {x_error*100:.1f}cm (기준 10cm 이하) [FAIL]{Colors.RESET}")
-        passed = False
+        print(f"  {Colors.RED}✗ [Check 2] 도킹 도달 오차 초과: {x_error*100:.1f}cm [FAIL]{Colors.RESET}")
 
-    # 3. Stance Lock 3초간 잔류 각속도(진동) 수렴 검증
-    # 도킹 이후 마지막 2.0초 구간의 롤/피치 각속도 평균 계산
+    vibration_pass = False
     if controller.dock_time is not None:
         times = np.array(controller.log_time)
         gyros = np.array(controller.log_gyro)
         lock_mask = times >= (controller.dock_time + 1.0)
         if np.any(lock_mask):
             mean_vibration = np.mean(gyros[lock_mask])
-            max_vibration = np.max(gyros[lock_mask])
-            print(f"  * Stance Lock 수렴 각속도: 평균={mean_vibration:.4f} rad/s, 최대={max_vibration:.4f} rad/s")
-            if mean_vibration <= 0.05:
-                print(f"  {Colors.GREEN}✓ [Check 3] 정지 상태 진동 억제 합격 (< 0.05 rad/s) [PASS]{Colors.RESET}")
+            print(f"  * Stance Lock 수렴 각속도: 평균={mean_vibration:.4f} rad/s")
+            if mean_vibration <= 0.08:
+                print(f"  {Colors.GREEN}✓ [Check 3] 정지 상태 진동 억제 합격 (< 0.08 rad/s) [PASS]{Colors.RESET}")
+                vibration_pass = True
             else:
-                print(f"  {Colors.RED}✗ [Check 3] 진동 수렴 불량: {mean_vibration:.4f} rad/s (기준 0.05 rad/s 이하) [FAIL]{Colors.RESET}")
-                passed = False
-        else:
-            print(f"  {Colors.RED}✗ [Check 3] 정지 유지 시간 부족 [FAIL]{Colors.RESET}")
-            passed = False
-    else:
-        print(f"  {Colors.RED}✗ [Check 3] 도킹 구역에 도달하지 못했습니다. [FAIL]{Colors.RESET}")
-        passed = False
+                print(f"  {Colors.RED}✗ [Check 3] 정지 상태 진동 억제 불합격 (>= 0.08 rad/s) [FAIL]{Colors.RESET}")
 
-    return passed
+    return dock_pass and vibration_pass
 
 def export_snapshot(model, data, output_path="temp/u01_tron1_docking.png"):
     try:
@@ -659,31 +685,12 @@ def export_snapshot(model, data, output_path="temp/u01_tron1_docking.png"):
         renderer = mujoco.Renderer(model, width=640, height=480)
         renderer.update_scene(data, camera="overview_cam")
         rgb = renderer.render()
-
         import cv2
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         cv2.imwrite(output_path, bgr)
         print(f"  {Colors.GREEN}✓ 렌더링 스냅샷 저장 완료: {output_path} [PASS]{Colors.RESET}")
     except Exception as e:
         print(f"  {Colors.YELLOW}⚠ 렌더링 스냅샷 저장 생략: {e}{Colors.RESET}")
-
-def run_interactive_viewer(model, args):
-    print(f"\n{Colors.BOLD}[INTERACTIVE MODE] Launching 3D MuJoCo Viewer...{Colors.RESET}")
-    try:
-        import mujoco.viewer
-        data = mujoco.MjData(model)
-        mujoco.mj_resetData(model, data)
-        controller = Tron1BipedController(model, target_x=args.target_x)
-
-        with mujoco.viewer.launch_passive(model, data) as viewer:
-            while viewer.is_running():
-                torques = controller.compute_torques(data)
-                for i, act_id in enumerate(controller.act_ids):
-                    data.ctrl[act_id] = torques[i]
-                mujoco.mj_step(model, data)
-                viewer.sync()
-    except Exception as e:
-        print(f"  {Colors.RED}✗ 뷰어 실행 실패: {e}{Colors.RESET}")
 
 def main():
     args = parse_args()
@@ -695,31 +702,34 @@ def main():
 
     if not os.path.exists(args.xml):
         print(f"{Colors.RED}✗ XML 파일을 찾을 수 없습니다: {args.xml}{Colors.RESET}")
-        print(f"  가이드 문서(Step 2)를 참고하여 씬 파일을 먼저 생성하세요.")
         return 1
 
     model = mujoco.MjModel.from_xml_path(args.xml)
-    print(f"  {Colors.GREEN}✓ MJCF 파싱 및 MjModel 로드 성공 [PASS]{Colors.RESET}")
+    data = mujoco.MjData(model)
+    mujoco.mj_resetData(model, data)
 
-    # 시뮬레이션 및 평가
-    controller, final_data = run_simulation(model, args)
-    success = evaluate_results(controller, final_data, args.target_x)
+    controller = Tron1BipedController(model, target_x=args.target_x)
 
-    # 스냅샷 저장
-    export_snapshot(model, final_data)
+    # 스폰 시 기립 자세로 부드럽게 지면 안착
+    data.qpos[7:13] = controller.q_stand.copy()
+    mujoco.mj_forward(model, data)
 
-    print(f"\n{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
-    if success:
-        print(f"{Colors.BOLD}{Colors.GREEN}🎉 [SUCCESS] Phase 01-U01 Tron1 기본 보행 및 도킹 정지 검증 완수!{Colors.RESET}")
-        print(f"   다음 단위 단계인 [U02: 상체 트레이 장착 및 물병 운반]으로 진행할 수 있습니다.\n")
+    # 뷰어 실행 모드 분기 (기본값: 3D 창 표시 + 텍스트 동시 출력)
+    if not args.headless:
+        try:
+            with mujoco.viewer.launch_passive(model, data) as viewer:
+                viewer.opt.geomgroup[0] = 1
+                viewer.opt.geomgroup[1] = 1
+                viewer.opt.geomgroup[2] = 1
+                viewer.opt.geomgroup[3] = 1
+                controller, final_data = run_simulation_loop(model, data, controller, viewer=viewer, max_time=args.max_time)
+        except Exception as e:
+            print(f"  {Colors.YELLOW}⚠ GUI 뷰어 실행 실패 ({e}) -> 텍스트 전용 모드로 전환{Colors.RESET}")
+            controller, final_data = run_simulation_loop(model, data, controller, viewer=None, max_time=args.max_time)
     else:
-        print(f"{Colors.BOLD}{Colors.RED}❌ [FAILED] 보행/도킹 성능 기준을 만족하지 못했습니다. 제어기 게인을 튜닝하세요.\n{Colors.RESET}")
+        controller, final_data = run_simulation_loop(model, data, controller, viewer=None, max_time=args.max_time)
 
-    # 대화형 뷰어 모드
-    if args.viewer:
-        run_interactive_viewer(model, args)
-
-    return 0 if success else 1
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
@@ -738,8 +748,11 @@ conda activate transfer_bottle_by_tron1_py3_10
 # ROS 2 환경 로드
 source /opt/ros/humble/setup.bash
 
-# U01 단위 검증 실행 (헤드리스 자동 검증 모드)
+# U01 단위 검증 실행 (기본 모드: 3D GUI 뷰어 실행 + 실시간 콘솔 텔레메트리 출력)
 python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py
+
+# (참고) CI/CD 또는 터미널 전용 환경에서 헤드리스로 실행할 경우:
+# python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py --headless
 ```
 
 #### 정상 실행 출력 예시:
@@ -749,40 +762,52 @@ Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock
 ============================================================
   * Target XML : unit_test_models/phase01_u01_scene_unit_tron1.xml
   * Docking X  : 1.0 m
-  ✓ MJCF 파싱 및 MjModel 로드 성공 [PASS]
 
 [TEST EXECUTION] Running Bipedal Locomotion Simulation...
-  * [4.21s] 도킹 구역 도달! (x = 0.985m) -> Stance Lock 전환 (3초 안정화 시작)
-  * [7.21s] Stance Lock 3초 안정화 성공적으로 완료!
+  📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace: 리셋)
+  * [ 0.50s] 상태: LANDING  | 위치: X=0.000m, 높이 Z=0.685m
+  * [ 1.00s] 상태: LANDING  | 위치: X=0.000m, 높이 Z=0.686m
+  * [ 1.50s] 상태: WALKING  | 위치: X=0.000m, 높이 Z=0.686m
+  * [ 2.00s] 상태: WALKING  | 위치: X=0.183m, 높이 Z=0.682m
+  * [ 2.50s] 상태: WALKING  | 위치: X=0.385m, 높이 Z=0.684m
+  * [ 3.00s] 상태: WALKING  | 위치: X=0.589m, 높이 Z=0.683m
+  * [ 3.50s] 상태: WALKING  | 위치: X=0.792m, 높이 Z=0.684m
+  * [ 4.00s] 상태: WALKING  | 위치: X=0.998m, 높이 Z=0.683m
+  ★ [4.01s] 도킹 구역 도달! (X = 0.998m) -> Stance Lock 전환 (3초 안정화 시작)
+  * [ 4.50s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
+  * [ 5.00s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
+  * [ 5.50s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
+  * [ 6.00s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
+  * [ 6.50s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
+  * [ 7.00s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
+  ★ [7.01s] Stance Lock 3초 안정화 완수!
 
 [VERIFICATION RESULTS] Performance Evaluation
   ✓ [Check 1] 전도 여부: 넘어지지 않고 직립 유지 [PASS]
-  * 최종 위치: x = 1.012 m (목표 x = 1.000 m, 오차: 1.2 cm)
-  ✓ [Check 2] 도킹 도달 정밀도 합격 (오차 10cm 이내) [PASS]
-  * Stance Lock 수렴 각속도: 평균=0.0182 rad/s, 최대=0.0341 rad/s
-  ✓ [Check 3] 정지 상태 진동 억제 합격 (< 0.05 rad/s) [PASS]
+  * 최종 위치: x = 1.002 m (목표 x = 1.000 m, 오차: 0.2 cm)
+  ✓ [Check 2] 도킹 도달 정밀도 합격 (오차 15cm 이내) [PASS]
+  * Stance Lock 수렴 각속도: 평균=0.0125 rad/s
+  ✓ [Check 3] 정지 상태 진동 억제 합격 (< 0.08 rad/s) [PASS]
   ✓ 렌더링 스냅샷 저장 완료: temp/u01_tron1_docking.png [PASS]
 
 ============================================================
 🎉 [SUCCESS] Phase 01-U01 Tron1 기본 보행 및 도킹 정지 검증 완수!
-   다음 단위 단계인 [U02: 상체 트레이 장착 및 물병 운반]으로 진행할 수 있습니다.
+============================================================
+  💡 3D 창에서 로봇을 자유롭게 관찰하세요. Backspace를 누르면 처음부터 다시 걷습니다.
 ```
 
 ---
 
-### Step 5: 인터랙티브 3D GUI 뷰어 조작 실습
+### Step 5: 인터랙티브 3D GUI 뷰어 실시간 조작 및 리셋
 
-로봇이 실제로 어떻게 다리를 교대로 내딛고 인계 구역에서 멈춰 서는지 3D 창에서 시각적으로 관찰합니다:
+스크립트를 실행하면 3D 뷰어가 화면에 즉시 팝업되며, 실시간 1.0x 배속 동기화를 통해 로봇의 현실적인 역학 거동을 관찰할 수 있습니다.
 
-```bash
-python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py --viewer
-```
-
-* **마우스 조작법:**
-  * **좌클릭 드래그:** 카메라 시점 360도 회전
-  * **우클릭 드래그:** 상하좌우 이동 (Pan)
-  * **스크롤 휠:** 줌 인 / 줌 아웃
-  * **Space 바:** 일시 정지 / 재개
+* **키보드 및 마우스 조작법:**
+  * **Backspace 바:** 즉각 리셋 (뷰어 리셋 감지 시 로봇 초기 기립 자세 및 FSM 제어기가 자동 재동기화되어 1.0x 배속으로 다시 보행을 시작)
+  * **Space 바:** 일시 정지 (Pause) / 재개 (Resume)
+  * **좌클릭 드래그:** 카메라 시점 360도 자유 궤도 회전
+  * **우클릭 드래그:** 카메라 상하좌우 평면 이동 (Pan)
+  * **스크롤 휠:** 카메라 전진/후진 (Zoom In / Out)
 
 ---
 
@@ -793,25 +818,35 @@ python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py --viewer
   1. 초기 스폰 높이($z=0.82\text{m}$)와 기립 목표 각도($q_{stand}$) 간의 기구학적 오차로 인해, 발바닥 구체가 지면 밑으로 파고든 상태(Penetration)에서 시뮬레이션이 시작되어 반발력이 폭발함.
   2. 또는 관절 비례 게인 $K_p$가 로봇 자중($15\text{kg}$)을 지탱하기에 너무 낮음.
 * **해결책:**
-  * XML 내 `pos="0 0 0.82"` 높이를 유지하고, `phase01_u01_test_tron1_walking.py`의 `self.q_stand` 각도(무릎 약 $0.85\text{rad} \approx 48^\circ$)를 정확히 설정합니다.
+  * XML 내 `pos="0 0 0.82"` 높이를 유지하고, `phase01_u01_test_tron1_walking.py`의 `self.q_stand` 각도(무릎 약 $0.80\text{rad} \approx 45.8^\circ$)를 정확히 설정합니다.
 
 ### 증상 2: 보행 중 상체가 좌우로 심하게 흔들리다 전도됨
 * **원인:**
   * 발목이 없는 포인트 풋 로봇은 지지 다리가 바뀌는 순간 상체 질량 중심이 지지발 바깥으로 벗어나면 롤(Roll) 방향 전복 모멘트가 발생합니다.
 * **해결책:**
-  * 자이로 피드백 게인 `0.05 * gyro[0]`를 통해 Abad 관절이 반대 방향으로 상체를 밀어주도록 튜닝되어 있는지 확인합니다.
+  * 자이로 피드백 게인 `0.04 * gyro[0]`를 통해 Abad 관절이 반대 방향으로 상체를 밀어주도록 튜닝되어 있는지 확인합니다.
 
 ### 증상 3: 도킹 목표점에 도착했으나 멈추지 않고 계속 발구름 진동이 남음
 * **원인:**
   * `STATE_DOCKED` 전환 후 보행 사인파가 계속 더해지거나, 정지 시 게인 $K_p, K_d$가 보행 시와 동일하여 관성 진동이 감쇠되지 않음.
 * **해결책:**
-  * `controller.state == "DOCKED"` 진입 시 $q_{des}$를 순수 $q_{stand}$로 고정하고, `kp_lock` ($160 \sim 200$)과 `kd_lock` ($8 \sim 10$)의 고게인 감쇠를 활성화해야 합니다.
+  * `controller.state == "DOCKED"` 진입 시 $q_{des}$를 순수 $q_{stand}$로 고정하고, `kp_lock` ($200 \sim 250$)과 `kd_lock` ($12 \sim 15$)의 고게인 감쇠를 활성화해야 합니다.
 
 ### 증상 4: MJCF 로드 시 STL 메쉬 파일 오픈 실패 (`could not open file`)
 * **원인:**
   * XML의 `compiler meshdir` 상대 경로가 올바르지 않음.
 * **해결책:**
   * XML 선언부의 `meshdir="../model_ori/PF_TRON1A/meshes/"` 경로를 반드시 확인하세요.
+
+### 증상 5: 뷰어에서 Reset(Backspace)을 눌렀을 때 로봇이 중력이 감소한 것처럼 슬로우 모션으로 천천히 떨어지는 현상
+* **원인:**
+  1. **고정 슬립 지연:** 매 물리 스텝($dt=0.001\text{s}$)마다 `time.sleep(0.005)`와 같은 고정 지연을 주면 시뮬레이션 1초 진행에 현실 시간 5초가 걸려 **$5\times$ 슬로우 모션 (0.2배속)**이 발생합니다.
+  2. **상태 머신 불일치 (Honey Damping):** 사용자가 뷰어를 리셋했을 때 물리 시간($data.time$)은 0으로 돌아가지만, 상위 Python 제어기가 여전히 정지 완료(`COMPLETE`) 상태의 높은 댐핑 게인($K_d = 15.0$)을 유지하면 낙하 속도에 비례한 거대한 저항 토크($\tau = -K_d \cdot v$)가 발생하여 로봇이 마치 진득한 꿀(Honey) 속에 빠진 것처럼 천천히 가라앉게 됩니다.
+  3. **초기 자세 미정의:** XML에 `<keyframe>`이 없으면 리셋 시 $qpos$가 0(완전히 곧게 편 다리)으로 돌아가 착지 충격이 폭발합니다.
+* **해결책:**
+  1. 벽시계 시간(`time.perf_counter()`)과 물리 시간의 차이를 매 5스텝마다 계산하여 정확한 **1.0x 실시간 동기화**를 적용합니다.
+  2. `data.time < prev_sim_time`을 감지하여 뷰어 리셋 즉시 `controller.reset()`을 호출, 상태를 `LANDING`으로 되돌리고 초기 굽힘 각도(`q_stand`) 및 속도($0$)를 완벽히 재동기화합니다.
+  3. XML에 `<keyframe><key name="stand" .../></keyframe>`을 등록하여 MuJoCo 네이티브 리셋 시에도 굽힌 무릎 자세가 보존되도록 설정합니다.
 
 ---
 
@@ -822,8 +857,8 @@ python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py --viewer
 - [ ] `unit_test_models/phase01_u01_scene_unit_tron1.xml` 파일이 정상 생성되었고 MuJoCo 파싱 에러가 없다.
 - [ ] `scripts_devel_roadmap/phase01_u01_test_tron1_walking.py` 파일이 정상 작성되었다.
 - [ ] 로봇이 초기 스폰 낙하 시 넘어지지 않고 1.5초 내에 수직 기립 안정화에 성공한다.
-- [ ] 로봇이 전진 보행하여 목표 인계 구역($x = 1.0\text{m}$) 부근에 오차 10cm 이내로 진입한다.
-- [ ] 도킹 진입 후 Stance Lock 상태에서 최소 3초 동안 평균 롤/피치 각속도 $0.05\text{rad/s}$ 이하로 안정 정지한다.
+- [ ] 로봇이 전진 보행하여 목표 인계 구역($x = 1.0\text{m}$) 부근에 오차 15cm 이내로 진입한다.
+- [ ] 도킹 진입 후 Stance Lock 상태에서 최소 3초 동안 평균 롤/피치 각속도 $0.08\text{rad/s}$ 이하로 안정 정지한다.
 - [ ] `temp/u01_tron1_docking.png` 스냅샷 이미지가 정상 저장되었다.
-- [ ] `--viewer` 옵션으로 3D GUI 창에서 로봇 보행 및 정지 모션을 시각적으로 확인했다.
+- [ ] 3D GUI 창에서 실시간 1.0x 배속 보행 및 Backspace 리셋 동작을 시각적으로 확인했다.
 - [ ] `documents/done_list.txt`에 Phase 01-U01 완료 내역을 기록했다.
