@@ -75,7 +75,7 @@
           contype="1" conaffinity="1" friction="1.0 0.005 0.0001" condim="3"/>
 
     <!-- 도킹 인계 구역 목표 마커 (x = 1.0m, y = 0.0m 지점에 반투명 원기둥 표시) -->
-    <geom name="docking_target_marker" type="cylinder" pos="1.0 0 0.005" size="0.25 0.005"
+    <geom name="docking_target_marker" type="cylinder" pos="1.0 0 0.001" size="0.25 0.001"
           material="target_marker_mat" contype="0" conaffinity="0" group="1"/>
 
     <!-- 조망 관찰 카메라 -->
@@ -85,9 +85,9 @@
 
     <!-- 
       [Tron1 로봇 모델 본체]
-      초기 스폰 위치: pos="0 0 0.82" (다리를 살짝 굽혔을 때 발끝이 지면에 정렬되는 안정 스폰 높이)
+      초기 스폰 위치: pos="0 0 0.7" (다리를 살짝 굽혔을 때 발끝이 지면에 정렬되는 안정 스폰 높이)
     -->
-    <body name="base_Link" pos="0 0 0.82">
+    <body name="base_Link" pos="0 0 0.7">
       <!-- 6-DOF 자유 관절 (공간 상을 자유롭게 이동 및 회전) -->
       <freejoint name="root_joint"/>
       
@@ -116,6 +116,8 @@
             <joint name="knee_L_Joint" axis="0 -1 0" range="-0.87 1.36"/>
             <geom class="visual" mesh="knee_L_Link" material="robot_body_mat"/>
             <geom name="knee_L_col" type="cylinder" pos="0.078 0 -0.12" euler="0 -0.55 0" size="0.015 0.13" class="collision"/>
+            <!-- 무릎 관절 힌지 바닥 충돌 방지용 구체 -->
+            <geom name="knee_L_cap_col" type="sphere" pos="0 0 0" size="0.032" class="collision"/>
 
             <!-- 왼발끝 포인트 풋 (구체 접촉자: 반지름 0.032m) -->
             <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_L_Link" material="robot_dark_mat"/>
@@ -144,6 +146,8 @@
             <joint name="knee_R_Joint" axis="0 1 0" range="-1.36 0.87"/>
             <geom class="visual" mesh="knee_R_Link" material="robot_body_mat"/>
             <geom name="knee_R_col" type="cylinder" pos="0.078 0 -0.12" euler="0 -0.55 0" size="0.015 0.13" class="collision"/>
+            <!-- 무릎 관절 힌지 바닥 충돌 방지용 구체 -->
+            <geom name="knee_R_cap_col" type="sphere" pos="0 0 0" size="0.032" class="collision"/>
 
             <!-- 오른발끝 포인트 풋 (구체 접촉자: 반지름 0.032m) -->
             <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_R_Link" material="robot_dark_mat"/>
@@ -158,12 +162,12 @@
 
   <!-- 7. 액추에이터 정의: 6개 모터 직접 토크 제어 ([-80, 80] Nm) -->
   <actuator>
-    <motor name="abad_L_motor" joint="abad_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
-    <motor name="hip_L_motor"  joint="hip_L_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
-    <motor name="knee_L_motor" joint="knee_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
-    <motor name="abad_R_motor" joint="abad_R_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
-    <motor name="hip_R_motor"  joint="hip_R_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
-    <motor name="knee_R_motor" joint="knee_R_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="abad_L_motor" joint="abad_L_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
+    <motor name="hip_L_motor"  joint="hip_L_Joint"  gear="1" ctrllimited="true" ctrlrange="-60 60"/>
+    <motor name="knee_L_motor" joint="knee_L_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
+    <motor name="abad_R_motor" joint="abad_R_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
+    <motor name="hip_R_motor"  joint="hip_R_Joint"  gear="1" ctrllimited="true" ctrlrange="-60 60"/>
+    <motor name="knee_R_motor" joint="knee_R_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
   </actuator>
 
   <!-- 8. 센서 정의: IMU 및 6개 관절 엔코더 -->
@@ -187,6 +191,7 @@
 
   <!-- 9. 기본 안정 기립 키프레임 (뷰어 리셋 시 기본 자세 자동 복원) -->
   <keyframe>
-    <key name="stand" qpos="0 0 0.82 1 0 0 0 0.0 0.40 0.80 0.0 -0.40 -0.80"/>
+    <!-- <key name="stand" qpos="0 0 0.8 1 0 0 0 0.0 0.40 0.65 0.0 -0.40 -0.65"/> -->
+    <key name="stand" qpos="0 0 0.53 1 0 0 0 0.0 0.40 1.25 0.0 -0.40 -1.25"/>
   </keyframe>
 </mujoco>

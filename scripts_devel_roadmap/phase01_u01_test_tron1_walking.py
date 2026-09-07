@@ -52,8 +52,12 @@ class Tron1BipedController:
         self.act_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in self.actuator_names]
         self.base_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "base_Link")
 
-        # 기립 기본 관절 각도 (자연스러운 완충 기립 자세)
-        self.q_stand = np.array([0.0, 0.40, 0.80,  0.0, -0.40, -0.80])
+        # 기립 기본 관절 각도 (XML의 'stand' 키프레임에서 자동 로드, 없으면 기본값 사용)
+        stand_key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+        if stand_key_id != -1:
+            self.q_stand = model.key_qpos[stand_key_id][7:13].copy()
+        else:
+            self.q_stand = np.array([0.0, 0.40, 0.80,  0.0, -0.40, -0.80])
 
         # 관절 강성 및 댐핑 게인
         self.kp_walk = np.array([120.0, 150.0, 150.0,  120.0, 150.0, 150.0])
@@ -95,7 +99,7 @@ class Tron1BipedController:
             q_des = self.q_stand.copy()
             kp = self.kp_walk
             kd = self.kd_walk
-            if sim_time >= 1.5:
+            if sim_time >= 10.0:
                 self.state = "WALKING"
 
         elif self.state == "WALKING":
@@ -168,8 +172,12 @@ def run_simulation_loop(model, data, controller, viewer=None, max_time=12.0):
         if data.time < prev_sim_time:
             print(f"\n  {Colors.YELLOW}↺ [RESET 감지] 뷰어 리셋이 감지되어 제어기 및 초기 관절 자세를 완벽히 재동기화합니다.{Colors.RESET}")
             controller.reset()
-            data.qpos[7:13] = controller.q_stand.copy()
-            data.qvel[:] = 0.0
+            stand_key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+            if stand_key_id != -1:
+                mujoco.mj_resetDataKeyframe(model, data, stand_key_id)
+            else:
+                data.qpos[7:13] = controller.q_stand.copy()
+                data.qvel[:] = 0.0
             mujoco.mj_forward(model, data)
             dock_reported = False
             evaluation_done = False
@@ -302,12 +310,20 @@ def main():
 
     model = mujoco.MjModel.from_xml_path(args.xml)
     data = mujoco.MjData(model)
-    mujoco.mj_resetData(model, data)
+
+    # XML 내 'stand' 키프레임 존재 여부 확인 및 자동 로드
+    stand_key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+    if stand_key_id != -1:
+        mujoco.mj_resetDataKeyframe(model, data, stand_key_id)
+        print(f"  {Colors.GREEN}✓ XML 'stand' 키프레임(초기 스폰 자세)을 성공적으로 로드했습니다.{Colors.RESET}")
+    else:
+        mujoco.mj_resetData(model, data)
 
     controller = Tron1BipedController(model, target_x=args.target_x)
 
-    # 스폰 시 기립 자세로 부드럽게 지면 안착
-    data.qpos[7:13] = controller.q_stand.copy()
+    # 스폰 시 기립 자세로 부드럽게 지면 안착 (키프레임이 없을 경우 fallback)
+    if stand_key_id == -1:
+        data.qpos[7:13] = controller.q_stand.copy()
     mujoco.mj_forward(model, data)
 
     # 뷰어 실행 모드 분기 (기본값: 3D 창 표시 + 텍스트 동시 출력)
