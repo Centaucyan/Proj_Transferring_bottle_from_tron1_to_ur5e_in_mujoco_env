@@ -1,6 +1,6 @@
 # [학습 보고서] Phase 01-U01 Tron1 MuJoCo `qpos` 및 관절 구조 상세 분석
 
-* **대상 파일**: [`unit_test_models/phase01_u01_scene_unit_tron1.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/unit_test_models/phase01_u01_scene_unit_tron1.xml)
+* **대상 파일**: [`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/xml_for_unit_test/phase01_u01_scene_unit_tron1.xml)
 * **연동 스크립트**: [`scripts_devel_roadmap/phase01_u01_test_tron1_walking.py`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/scripts_devel_roadmap/phase01_u01_test_tron1_walking.py)
 * **작성 목적**: 부유 베이스(Floating-base) 2족 보행 로봇 Tron1의 `qpos` 배열(총 13개)의 세부 구성과 파이썬 제어기 인덱싱 원리를 체계적으로 정리.
 

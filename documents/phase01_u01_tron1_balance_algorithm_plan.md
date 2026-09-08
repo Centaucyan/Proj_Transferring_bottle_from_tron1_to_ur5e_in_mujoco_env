@@ -3,7 +3,7 @@
 * **문서 위치:** `documents/phase01_u01_tron1_balance_algorithm_plan.md`
 * **대상 프로젝트:** `Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env`
 * **작성일:** 2026-09-08
-* **적용 대상:** Tron1 로봇 씬 XML (`unit_test_models/phase01_u01_scene_unit_tron1.xml`), 검증 스크립트 (`scripts_devel_roadmap/phase01_u01_test_tron1_walking.py`)
+* **적용 대상:** Tron1 로봇 씬 XML (`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`), 검증 스크립트 (`scripts_devel_roadmap/phase01_u01_test_tron1_walking.py`)
 
 ---
 
@@ -86,7 +86,7 @@ flowchart TD
 
 ## 3. 제안하는 구체적 코드 변경 사항 (Proposed Changes)
 
-### 1) XML 모델 (`unit_test_models/phase01_u01_scene_unit_tron1.xml`)
+### 1) XML 모델 (`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`)
 * **스폰 위치 및 키프레임 수정**:
   * `<body name="base_Link" pos="0 0 0.585">` (지면에 발끝이 살포시 안착하는 높이)
   * `<key name="stand" qpos="0 0 0.585 1 0 0 0 0.0 0.30 1.05 0.0 -0.30 -1.05"/>`

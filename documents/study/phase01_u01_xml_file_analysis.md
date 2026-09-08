@@ -1,6 +1,6 @@
 # [기술 분석 보고서] Phase 01-U01 Tron1 MuJoCo 시뮬레이션 환경 XML 심층 분석
 
-* **대상 파일**: [`unit_test_models/phase01_u01_scene_unit_tron1.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/unit_test_models/phase01_u01_scene_unit_tron1.xml)
+* **대상 파일**: [`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/xml_for_unit_test/phase01_u01_scene_unit_tron1.xml)
 * **연동 검증 스크립트**: [`scripts_devel_roadmap/phase01_u01_test_tron1_walking.py`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/scripts_devel_roadmap/phase01_u01_test_tron1_walking.py)
 * **참조 모델**: [`model_ori/PF_TRON1A/xml/robot.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/model_ori/PF_TRON1A/xml/robot.xml)
 * **작성 목적**: LimX Dynamics Tron1 2족 보행 로봇의 단독 보행 및 도킹 정지 환경의 물리 엔진 설정, 기구학 체인, 액추에이터/센서 시스템, 그리고 하드웨어 정합성을 단계별로 완벽히 분석 및 정리.

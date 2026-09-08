@@ -22,7 +22,7 @@
    * [2.7. 도킹 정지(Stance Lock)와 미세 발구름(In-place Stepping) 진동 억제](#27-도킹-정지stance-lock와-미세-발구름in-place-stepping-진동-억제)
 3. [단계별 실습: 내 손으로 직접 만들고 검증하기](#3-단계별-실습-내-손으로-직접-만들고-검증하기)
    * [Step 1: 작업 디렉토리 확인](#step-1-작업-디렉토리-확인)
-   * [Step 2: 단위 샌드박스 씬 (unit_test_models/phase01_u01_scene_unit_tron1.xml) 직접 작성](#step-2-단위-샌드박스-씬-unit_test_modelsphase01_u01_scene_unit_tron1xml-직접-작성)
+   * [Step 2: 단위 샌드박스 씬 (xml_for_unit_test/phase01_u01_scene_unit_tron1.xml) 직접 작성](#step-2-단위-샌드박스-씬-xml_for_unit_testphase01_u01_scene_unit_tron1xml-직접-작성)
    * [Step 3: 단위 검증 스크립트 (scripts_devel_roadmap/phase01_u01_test_tron1_walking.py) 직접 작성](#step-3-단위-검증-스크립트-scripts_devel_roadmapphase01_u01_test_tron1_walkingpy-직접-작성)
    * [Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 해석)](#step-4-스크립트-실행-및-결과-검증-물리-정합성-해석)
    * [Step 5: 인터랙티브 3D GUI 뷰어 조작 실습](#step-5-인터랙티브-3d-gui-뷰어-조작-실습)
@@ -187,12 +187,12 @@ pwd
 
 ---
 
-### Step 2: 단위 샌드박스 씬 (`unit_test_models/phase01_u01_scene_unit_tron1.xml`) 직접 작성
+### Step 2: 단위 샌드박스 씬 (`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`) 직접 작성
 
 U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic")과 바닥 평면을 기반으로, Tron1의 기구체, STL 메쉬, 모터 액추에이터, IMU 센서를 결합한 단독 단위 씬입니다.
 
 파일을 새로 생성하고 아래의 전체 MJCF 코드를 저장합니다:
-* **생성할 파일 경로:** `unit_test_models/phase01_u01_scene_unit_tron1.xml`
+* **생성할 파일 경로:** `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`
 
 ```xml
 <mujoco model="phase01_u01_unit_tron1">
@@ -431,7 +431,7 @@ class Colors:
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U01 Tron1 Locomotion Test")
     parser.add_argument("--headless", action="store_true", help="Run in headless text-only mode (no GUI window)")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u01_scene_unit_tron1.xml",
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u01_scene_unit_tron1.xml",
                         help="Path to Tron1 unit scene XML")
     parser.add_argument("--target_x", type=float, default=1.0, help="Target docking X coordinate in meters")
     parser.add_argument("--max_time", type=float, default=12.0, help="Maximum simulation time limit in seconds")
@@ -760,7 +760,7 @@ python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py
 ============================================================
 Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock
 ============================================================
-  * Target XML : unit_test_models/phase01_u01_scene_unit_tron1.xml
+  * Target XML : xml_for_unit_test/phase01_u01_scene_unit_tron1.xml
   * Docking X  : 1.0 m
 
 [TEST EXECUTION] Running Bipedal Locomotion Simulation...
@@ -854,7 +854,7 @@ Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock
 
 직접 모든 파일 생성과 테스트를 마친 후 아래 항목들이 정상인지 스스로 점검해 보세요:
 
-- [ ] `unit_test_models/phase01_u01_scene_unit_tron1.xml` 파일이 정상 생성되었고 MuJoCo 파싱 에러가 없다.
+- [ ] `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml` 파일이 정상 생성되었고 MuJoCo 파싱 에러가 없다.
 - [ ] `scripts_devel_roadmap/phase01_u01_test_tron1_walking.py` 파일이 정상 작성되었다.
 - [ ] 로봇이 초기 스폰 낙하 시 넘어지지 않고 1.5초 내에 수직 기립 안정화에 성공한다.
 - [ ] 로봇이 전진 보행하여 목표 인계 구역($x = 1.0\text{m}$) 부근에 오차 15cm 이내로 진입한다.

@@ -96,7 +96,7 @@ flowchart TD
 
 ### [U00] 단위 검증 샌드박스 공통 환경 및 모델 로더 검증
 * **목표:** 개별 단위 씬들이 공통으로 참조할 바닥 평면, 광원, 카메라, 기본 물리 파라미터를 규격화하고, Python에서 MuJoCo 모델을 안전하게 로드·렌더링하는 기본 검증 파이프라인 수립.
-* **사용 씬:** `unit_test_models/phase01_u00_scene_unit_base.xml`
+* **사용 씬:** `xml_for_unit_test/phase01_u00_scene_unit_base.xml`
 * **검증 내용:**
   1. 공통 물리 옵션(중력, 고정 시간 간격 $dt=0.002s$, 적분기 `implicitfast`) 정의 및 로드 테스트.
   2. 대화형 Viewer(`mujoco.viewer`) 및 Headless 렌더러 동작 확인.
@@ -108,7 +108,7 @@ flowchart TD
 
 ### [U01] Tron1 공식 강화학습(RL) 이족보행 및 원점 제자리 발구름 단독 검증
 * **목표:** LimX Dynamics 공식 상용 사전훈련 ONNX 모델(`policy.onnx`, `encoder.onnx`)을 활용하여, 점 발바닥(Point-foot, $\tau_{\text{ankle}}=0$) 로봇이 외부 외란 속에서도 넘어지지 않고 제자리 발구름(In-place Stepping) 및 원점 위치를 완벽히 유지하는지 물리/제어 검증.
-* **사용 씬:** `unit_test_models/phase01_u01_scene_unit_tron1.xml` (Tron1 + 무한 바닥 평면)
+* **사용 씬:** `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml` (Tron1 + 무한 바닥 평면)
 * **핵심 이론:**
   * 2단계 ONNX 아키텍처: 10스텝 관측치 히스토리(300차원) $\rightarrow$ 인코더(잠재 3차원) $\rightarrow$ 액터 정책망(36차원 $\rightarrow$ 6차원 잔차 각도).
   * 500Hz 물리 연산과 50Hz RL 정책 추론의 Decimation(=10) 연동 메커니즘.
@@ -130,7 +130,7 @@ flowchart TD
 
 ### [U02] Tron1 상체 컵홀더 트레이 장착, 물병 적재 운반 및 테이블 도킹 정지 검증
 * **목표:** Tron1 상체(`base_Link`)에 3구 컵홀더 트레이와 전면 완충 범퍼를 장착하고, 실제 물병(`model_ori/bottle/bottle.xml`)을 1~3개 실은 상태에서 500Hz LimX RL 제자리 발구름 및 보행 안정성을 검증함과 동시에, 작업대 테이블 모서리에 상체 전면 범퍼를 살짝 기대어 안착(Table Bumper Rest)시킴으로써 발구름을 완전히 멈추고(`Stance Lock`, stepping OFF) 3점 지지를 통해 진동 0의 무진동 정적 안정 상태(`READY_FOR_PICK`)를 확립하는 도킹 메커니즘까지 단독 샌드박스 씬에서 완벽히 물리 검증.
-* **사용 씬:** `unit_test_models/phase01_u02_scene_unit_tron1_payload.xml` (Tron1 + 컵홀더 트레이 + 전면 완충 범퍼 + 물병 1~3개 + 도킹 턱이 구비된 작업대 테이블 모서리 모델)
+* **사용 씬:** `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml` (Tron1 + 컵홀더 트레이 + 전면 완충 범퍼 + 물병 1~3개 + 도킹 턱이 구비된 작업대 테이블 모서리 모델)
 * **핵심 이론:**
   * 페이로드 질량(개당 150g, 총 450g) 추가에 따른 상체 동역학 및 CoM 상승에 대한 LimX 잠재 인코더의 온라인 외란 추정 강건성.
   * 컵홀더 림(Rim) 높이와 접촉 마찰 계수(`friction="1.2 0.005 0.0001"`)에 의한 전도 모멘트 감쇠.
@@ -151,7 +151,7 @@ flowchart TD
 
 ### [U03] RealSense D435i (Eye-in-Hand) 3D 비전 인식 및 기하학적 중심점 추출 단독 검증
 * **목표:** 그리퍼 중앙에 장착된 D435i 카메라(Eye-in-Hand) 시점에서 트레이에 적재된 물병을 촬영하여, 정확한 3D 중심점(Centroid)을 산출할 수 있는지 알고리즘 검증.
-* **사용 씬:** `unit_test_models/phase01_u03_scene_unit_vision.xml` (D435i + 트레이 거치대 + 물병 1~3개)
+* **사용 씬:** `xml_for_unit_test/phase01_u03_scene_unit_vision.xml` (D435i + 트레이 거치대 + 물병 1~3개)
 * **핵심 이론:**
   * 핀홀 카메라 모델과 역투영(Back-projection):
     $$X = \frac{(u - c_x) \cdot Z}{f_x}, \quad Y = \frac{(v - c_y) \cdot Z}{f_y}$$
@@ -171,7 +171,7 @@ flowchart TD
 
 ### [U04] UR5e + 2F-85 + D435i 조립 및 물병 Pick & Lift 파지 단독 검증
 * **목표:** UR5e 엔드이펙터에 D435i 카메라 브라켓과 Robotiq 2F-85 그리퍼를 일체형으로 결합하고, 주어진 중심점 좌표로 접근하여 물병을 파지 및 수직 상승시키는 기구학 및 접촉 물리 검증.
-* **사용 씬:** `unit_test_models/phase01_u04_scene_unit_pick.xml` (UR5e + 2F-85 + D435i + 고정 물병)
+* **사용 씬:** `xml_for_unit_test/phase01_u04_scene_unit_pick.xml` (UR5e + 2F-85 + D435i + 고정 물병)
 * **핵심 이론:**
   * Robotiq 2F-85 4절 링크(Four-bar linkage) 미믹(Mimic) 구속 및 평행 파지 역학.
   * Approach(사전 접근) $\rightarrow$ Grasp $\rightarrow$ Lift(수직 상승) 경유점(Waypoints) 제어.
@@ -190,7 +190,7 @@ flowchart TD
 
 ### [U05] UR5e + 2F-85 물병 Place(배치) 및 관측 포즈 복귀 단독 검증
 * **목표:** 파지한 물병을 Station Table의 Place 지정 구역으로 이송하여 넘어뜨리지 않고 직립 안착시킨 후, 그리퍼를 벌리고 다음 스캔을 위한 관측 대기 포즈(Scan Pose)로 안전 복귀하는 동작 검증.
-* **사용 씬:** `unit_test_models/phase01_u05_scene_unit_place.xml` (물병을 쥔 UR5e + 작업대 Place 슬롯)
+* **사용 씬:** `xml_for_unit_test/phase01_u05_scene_unit_place.xml` (물병을 쥔 UR5e + 작업대 Place 슬롯)
 * **핵심 이론:**
   * 직립 배치(Vertical Placement)를 위한 엔드이펙터 수직 하향 쿼터니언 자세 구속.
   * 충격 완화(Soft Touchdown) 및 이탈 후퇴(Retreat) 벡터 설계.
@@ -367,12 +367,12 @@ flowchart TD
 | 단계 (Phase) | 세부 단위 (Unit) | 핵심 작업 및 목표 | 진행 상태 | 상세 가이드 파일 (.md) | 주요 실행 산출물 |
 | :---: | :---: | :--- | :---: | :--- | :--- |
 | **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | **완료** | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `scripts_devel_roadmap/phase00_check_env.py` |
-| **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | **완료** | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `unit_test_models/phase01_u00_scene_unit_base.xml`<br>`scripts_devel_roadmap/phase01_u00_test_base_sandbox.py` |
-|  | **U01** | Tron1 LimX 공식 RL 제자리 발구름 및 원점 유지 | **완료** | `documents/development_roadmap/rm_phase01_u01_tron1_walking.md` | `unit_test_models/phase01_u01_scene_unit_tron1.xml`<br>`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`<br>`documents/study/phase01_u01_limx_rl_model_and_mujoco_integration.md` |
-|  | **U02** | Tron1 트레이 장착, 물병 적재 운반 & 테이블 도킹 정지 검증 | **진행 예정** | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `unit_test_models/phase01_u02_scene_unit_tron1_payload.xml`<br>`scripts_devel_roadmap/phase01_u02_test_tron1_payload.py` |
-|  | **U03** | D435i (Eye-in-Hand) 3D 비전 인식 및 중심점 추출 | 대기 | `documents/development_roadmap/rm_phase01_u03_vision_centroid.md` | `unit_test_models/phase01_u03_scene_unit_vision.xml`<br>`scripts_devel_roadmap/phase01_u03_test_vision_centroid.py` |
-|  | **U04** | UR5e + 2F-85 + D435i 조립 및 물병 Pick & Lift | 대기 | `documents/development_roadmap/rm_phase01_u04_arm_pick_lift.md` | `unit_test_models/phase01_u04_scene_unit_pick.xml`<br>`scripts_devel_roadmap/phase01_u04_test_arm_pick_lift.py` |
-|  | **U05** | UR5e + 2F-85 물병 Place 및 Scan Pose 복귀 | 대기 | `documents/development_roadmap/rm_phase01_u05_arm_place.md` | `unit_test_models/phase01_u05_scene_unit_place.xml`<br>`scripts_devel_roadmap/phase01_u05_test_arm_place.py` |
+| **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | **완료** | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `xml_for_unit_test/phase01_u00_scene_unit_base.xml`<br>`scripts_devel_roadmap/phase01_u00_test_base_sandbox.py` |
+|  | **U01** | Tron1 LimX 공식 RL 제자리 발구름 및 원점 유지 | **완료** | `documents/development_roadmap/rm_phase01_u01_tron1_walking.md` | `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`<br>`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`<br>`documents/study/phase01_u01_limx_rl_model_and_mujoco_integration.md` |
+|  | **U02** | Tron1 트레이 장착, 물병 적재 운반 & 테이블 도킹 정지 검증 | **진행 예정** | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`<br>`scripts_devel_roadmap/phase01_u02_test_tron1_payload.py` |
+|  | **U03** | D435i (Eye-in-Hand) 3D 비전 인식 및 중심점 추출 | 대기 | `documents/development_roadmap/rm_phase01_u03_vision_centroid.md` | `xml_for_unit_test/phase01_u03_scene_unit_vision.xml`<br>`scripts_devel_roadmap/phase01_u03_test_vision_centroid.py` |
+|  | **U04** | UR5e + 2F-85 + D435i 조립 및 물병 Pick & Lift | 대기 | `documents/development_roadmap/rm_phase01_u04_arm_pick_lift.md` | `xml_for_unit_test/phase01_u04_scene_unit_pick.xml`<br>`scripts_devel_roadmap/phase01_u04_test_arm_pick_lift.py` |
+|  | **U05** | UR5e + 2F-85 물병 Place 및 Scan Pose 복귀 | 대기 | `documents/development_roadmap/rm_phase01_u05_arm_place.md` | `xml_for_unit_test/phase01_u05_scene_unit_place.xml`<br>`scripts_devel_roadmap/phase01_u05_test_arm_place.py` |
 | **Phase 02** | - | 멀티 로봇 통합 씬 구축 (Eye-in-Hand + 도킹 턱) | 대기 | `documents/development_roadmap/rm_phase02_integrated_scene.md` | `models/scene_integrated.xml`<br>`scripts_devel_roadmap/view_integrated_scene.py` |
 | **Phase 03** | - | ROS 2 - MuJoCo 비동기 통신 브리지 (500Hz/50Hz) | 대기 | `documents/development_roadmap/rm_phase03_ros2_mujoco_bridge.md` | `src/sim_bridge/mujoco_ros_bridge.py` |
 | **Phase 04** | - | Eye-in-Hand 3D 비전 노드 & 동적 TF2 변환 | 대기 | `documents/development_roadmap/rm_phase04_vision_pipeline_tf2.md` | `src/vision/bottle_detector_3d.py` |

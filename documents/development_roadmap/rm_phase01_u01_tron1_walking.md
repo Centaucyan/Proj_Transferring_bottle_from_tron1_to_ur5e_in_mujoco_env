@@ -25,7 +25,7 @@
    * [2.6. 제자리 발구름(In-place Stepping)의 동적 평형 원리](#26-제자리-발구름in-place-stepping의-동적-평형-원리)
 3. [단계별 실습: 내 손으로 직접 만들고 검증하기](#3-단계별-실습-내-손으로-직접-만들고-검증하기)
    * [Step 1: 환경 설정 및 공식 사전 훈련 모델 준비](#step-1-환경-설정-및-공식-사전-훈련-모델-준비)
-   * [Step 2: 단위 샌드박스 씬 (unit_test_models/phase01_u01_scene_unit_tron1.xml) 직접 작성](#step-2-단위-샌드박스-씬-unit_test_modelsphase01_u01_scene_unit_tron1xml-직접-작성)
+   * [Step 2: 단위 샌드박스 씬 (xml_for_unit_test/phase01_u01_scene_unit_tron1.xml) 직접 작성](#step-2-단위-샌드박스-씬-xml_for_unit_testphase01_u01_scene_unit_tron1xml-직접-작성)
    * [Step 3: RL 제자리 발구름 제어 스크립트 (scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py) 직접 작성](#step-3-rl-제자리-발구름-제어-스크립트-scripts_devel_roadmapphase01_u01_test_tron1_walking_rlpy-직접-작성)
    * [Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 및 텔레메트리 해석)](#step-4-스크립트-실행-및-결과-검증-물리-정합성-및-텔레메트리-해석)
    * [Step 5: 인터랙티브 3D GUI 뷰어 조작 및 Reset 동기화 실습](#step-5-인터랙티브-3d-gui-뷰어-조작-및-reset-동기화-실습)
@@ -176,12 +176,12 @@ wget -O model_rl/tron1/encoder.onnx https://github.com/limxdynamics/tron1-rl-dep
 
 ---
 
-### Step 2: 단위 샌드박스 씬 (`unit_test_models/phase01_u01_scene_unit_tron1.xml`) 직접 작성
+### Step 2: 단위 샌드박스 씬 (`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`) 직접 작성
 
 U00의 베이스 환경(바닥 평면, 격자 텍스처, implicitfast 물리 옵션)을 상속하고, Tron1 로봇 기구체와 모터 액추에이터, IMU 센서를 결합한 단독 씬 파일입니다.
 
 새 파일을 생성하고 아래의 **전체 MJCF XML 코드(198줄)**를 그대로 저장합니다:
-* **생성 파일 경로:** `unit_test_models/phase01_u01_scene_unit_tron1.xml`
+* **생성 파일 경로:** `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`
 
 ```xml
 <mujoco model="phase01_u01_unit_tron1">
@@ -447,7 +447,7 @@ class Colors:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U01: Tron1 Pretrained RL In-place Stepping")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u01_scene_unit_tron1.xml",
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u01_scene_unit_tron1.xml",
                         help="Path to Tron1 unit scene XML")
     parser.add_argument("--model_dir", type=str, default="model_rl/tron1",
                         help="Path to directory containing policy.onnx and encoder.onnx")
@@ -878,7 +878,7 @@ python scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
 ## 5. Phase 01-U01 Step 1 완료 체크리스트
 
 * [x] `model_rl/tron1/` 디렉토리에 `policy.onnx`와 `encoder.onnx`가 정상 배치되었는가?
-* [x] `unit_test_models/phase01_u01_scene_unit_tron1.xml`이 오류 없이 MuJoCo 뷰어에서 로드되는가?
+* [x] `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`이 오류 없이 MuJoCo 뷰어에서 로드되는가?
 * [x] 스폰 착지 후 앞으로 고꾸라지지 않고 0.15초 내에 `stepping` 상태로 진입하는가?
 * [x] 최소 10초 이상 연속으로 제자리 발구름을 수행하며 베이스 높이 $Z \approx 0.76\text{m}$ 및 $X \approx 0.00\text{m}$를 유지하는가?
 * [x] `Ctrl` + 마우스 우클릭 드래그로 외력을 가했을 때 넘어지지 않고 균형을 회복하는가?

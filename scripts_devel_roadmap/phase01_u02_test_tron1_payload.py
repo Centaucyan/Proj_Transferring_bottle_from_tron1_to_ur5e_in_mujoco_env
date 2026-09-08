@@ -64,7 +64,7 @@ class U02Telemetry:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U02: Tron1 Payload Transport & Table Docking")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u02_scene_unit_tron1_payload.xml",
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml",
                         help="Path to Tron1 payload unit scene XML")
     parser.add_argument("--model_dir", type=str, default="model_rl/tron1",
                         help="Path to directory containing policy.onnx and encoder.onnx")

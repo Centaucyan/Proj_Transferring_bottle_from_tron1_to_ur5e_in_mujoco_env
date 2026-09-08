@@ -30,7 +30,7 @@ class Colors:
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U00 Base Sandbox Test")
     parser.add_argument("--viewer", action="store_true", help="Launch interactive 3D GUI viewer")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u00_scene_unit_base.xml", help="Path to base scene XML")
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u00_scene_unit_base.xml", help="Path to base scene XML")
     return parser.parse_args()
 
 def verify_physics_parameters(model):

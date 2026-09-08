@@ -6,7 +6,7 @@
   * `model_rl/tron1/policy.onnx` (액터 정책 신경망)
 * **공식 출처**: LimX Dynamics 공식 오픈소스 [`limxdynamics/tron1-rl-deploy-python`](https://github.com/limxdynamics/tron1-rl-deploy-python)
 * **실습 스크립트**: [`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py)
-* **물리 시뮬레이션 환경**: [`unit_test_models/phase01_u01_scene_unit_tron1.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/unit_test_models/phase01_u01_scene_unit_tron1.xml) (MuJoCo 3.12.0)
+* **물리 시뮬레이션 환경**: [`xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/xml_for_unit_test/phase01_u01_scene_unit_tron1.xml) (MuJoCo 3.12.0)
 
 ---
 

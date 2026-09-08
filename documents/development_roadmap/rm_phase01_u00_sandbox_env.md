@@ -21,7 +21,7 @@
    * [2.6. 물리 0점 조절용 자유낙하 검증체(test_ball)와 Geom 그룹 메커니즘](#26-물리-0점-조절용-자유낙하-검증체test_ball와-geom-그룹-메커니즘)
 3. [단계별 실습: 내 손으로 직접 만들고 검증하기](#3-단계별-실습-내-손으로-직접-만들고-검증하기)
    * [Step 1: 디렉토리 구조 생성](#step-1-디렉토리-구조-생성)
-   * [Step 2: 공통 단위 샌드박스 씬 (unit_test_models/phase01_u00_scene_unit_base.xml) 작성](#step-2-공통-단위-샌드박스-씬-unit_test_modelsphase01_u00_scene_unit_basexml-작성)
+   * [Step 2: 공통 단위 샌드박스 씬 (xml_for_unit_test/phase01_u00_scene_unit_base.xml) 작성](#step-2-공통-단위-샌드박스-씬-xml_for_unit_testphase01_u00_scene_unit_basexml-작성)
    * [Step 3: 단위 검증 스크립트 (scripts_devel_roadmap/phase01_u00_test_base_sandbox.py) 작성](#step-3-단위-검증-스크립트-scripts_devel_roadmapphase01_u00_test_base_sandboxpy-작성)
    * [Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 해석)](#step-4-스크립트-실행-및-결과-검증-물리-정합성-해석)
    * [Step 5: 인터랙티브 GUI 3D 뷰어 조작 실습](#step-5-인터랙티브-gui-3d-뷰어-조작-실습)
@@ -209,7 +209,7 @@ MuJoCo 뷰어는 화면을 렌더링할 때 깔끔한 그래픽을 위해 기본
 
 ### Step 1: 디렉토리 구조 생성
 
-단위 검증에 사용할 MJCF 모델 디렉토리(`unit_test_models`)를 생성합니다.  
+단위 검증에 사용할 MJCF 모델 디렉토리(`xml_for_unit_test`)를 생성합니다.  
 *(단위 테스트 스크립트는 별도의 하위 폴더 없이 기존 `scripts_devel_roadmap/` 폴더 내에 접두어 `phase01_u00_`을 붙여 직접 관리합니다.)*
 
 ```bash
@@ -217,17 +217,17 @@ MuJoCo 뷰어는 화면을 렌더링할 때 깔끔한 그래픽을 위해 기본
 cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
 
 # 2. 단위 테스트 모델 폴더 생성
-mkdir -p unit_test_models
+mkdir -p xml_for_unit_test
 ```
 
 ---
 
-### Step 2: 공통 단위 샌드박스 씬 (`unit_test_models/phase01_u00_scene_unit_base.xml`) 작성
+### Step 2: 공통 단위 샌드박스 씬 (`xml_for_unit_test/phase01_u00_scene_unit_base.xml`) 작성
 
 모든 단위 검증(U01~U05)의 부모 씬이 될 표준 베이스 씬을 작성합니다.  
 이 씬에는 **바닥 평면(Checkered Grid Floor), 전역 태양광, 헤드리스 렌더링 해상도 설정, 그리고 물리 수치 검증용 테스트 구체(Freefall Ball)**가 포함됩니다.
 
-`unit_test_models/phase01_u00_scene_unit_base.xml` 파일을 생성하고 아래 내용을 입력합니다:
+`xml_for_unit_test/phase01_u00_scene_unit_base.xml` 파일을 생성하고 아래 내용을 입력합니다:
 
 ```xml
 <mujoco model="unit_sandbox_base">
@@ -375,7 +375,7 @@ class Colors:
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U00 Base Sandbox Test")
     parser.add_argument("--viewer", action="store_true", help="Launch interactive 3D GUI viewer")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u00_scene_unit_base.xml", help="Path to base scene XML")
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u00_scene_unit_base.xml", help="Path to base scene XML")
     return parser.parse_args()
 
 def verify_physics_parameters(model):
@@ -611,7 +611,7 @@ python scripts_devel_roadmap/phase01_u00_test_base_sandbox.py
 ============================================================
 Phase 01-U00: Unit Sandbox Base Environment Verification
 ============================================================
-  * Target XML: unit_test_models/phase01_u00_scene_unit_base.xml
+  * Target XML: xml_for_unit_test/phase01_u00_scene_unit_base.xml
   ✓ XML 파싱 및 MjModel 로드 성공 [PASS]
 
 [TEST 1] Physics Engine Parameters Verification
@@ -691,7 +691,7 @@ python scripts_devel_roadmap/phase01_u00_test_base_sandbox.py --viewer
 
 ### Q1. `XML error: Schema violation: ...`
 * **원인:** XML 태그 이름이나 속성 오타 (예: `gravity="0 0 -9.81"` 대신 `grav="0 0 -9.81"`).
-* **조치:** MJCF 표준 속성명을 확인하고 `unit_test_models/phase01_u00_scene_unit_base.xml`의 문법을 재점검합니다.
+* **조치:** MJCF 표준 속성명을 확인하고 `xml_for_unit_test/phase01_u00_scene_unit_base.xml`의 문법을 재점검합니다.
 
 ### Q2. `--viewer` 실행 시 `GLFW error: Wayland / X11 connection failed`
 * **원인:** SSH 원격 접속 중이거나 X-Server 디스플레이 환경 변수(`$DISPLAY`)가 설정되지 않은 상태에서 GUI 창을 띄우려고 함.
@@ -727,7 +727,7 @@ python scripts_devel_roadmap/phase01_u00_test_base_sandbox.py --viewer
 
 ##### 방법 1: 시뮬레이션 타임스텝($dt$) 세분화 (정밀 물리 모드)
 타임스텝 $dt$를 $0.002\text{s}$ ($500\text{Hz}$)에서 $0.001\text{s}$ ($1000\text{Hz}$) 또는 $0.0005\text{s}$ ($2000\text{Hz}$)로 좁히면 1스텝의 시간 폭이 절반 이하로 줄어들어 오차율이 **$0.1\%$ 미만**으로 즉시 감소합니다.
-* `unit_test_models/phase01_u00_scene_unit_base.xml` 수정:
+* `xml_for_unit_test/phase01_u00_scene_unit_base.xml` 수정:
   ```xml
   <!-- 기존: timestep="0.002" -> 변경: 0.001 (1000 Hz) -->
   <option timestep="0.001" gravity="0 0 -9.81" integrator="implicitfast"/>
@@ -782,7 +782,7 @@ if data.ncon > 0:
 
 다음 단계인 **[U01: Tron1 기본 이족보행 및 도킹 정지 단독 검증]**으로 넘어가기 전, 아래 항목이 모두 완료되었는지 점검하세요:
 
-- [ ] `unit_test_models/phase01_u00_scene_unit_base.xml` 파일이 생성되었고, 바닥 평면 및 공통 물리 옵션이 정의되었는가?
+- [ ] `xml_for_unit_test/phase01_u00_scene_unit_base.xml` 파일이 생성되었고, 바닥 평면 및 공통 물리 옵션이 정의되었는가?
 - [ ] `scripts_devel_roadmap/phase01_u00_test_base_sandbox.py` 파일이 생성되고 실행 권한이 부여되었는가?
 - [ ] 스크립트 실행 시 Physics Parameters, Freefall Dynamics, Offscreen Rendering이 모두 `[PASS]`를 기록하는가?
 - [ ] `temp/u00_base_scene.png` 파일이 정상 생성되어 바닥 그리드와 빨간색 구체가 렌더링되었는가?

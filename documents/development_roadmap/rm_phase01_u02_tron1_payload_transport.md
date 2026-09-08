@@ -29,7 +29,7 @@
    * [2.8. 언도킹(Undocking: 후퇴 보행 및 자립 발구름 복귀) 역학](#28-언도킹undocking-후퇴-보행-및-자립-발구름-복귀-역학)
 3. [단계별 실습: 내 손으로 직접 만들고 검증하기](#3-단계별-실습-내-손으로-직접-만들고-검증하기)
    * [Step 1: 작업 환경 확인 및 디렉토리/에셋 사전 준비](#step-1-작업-환경-확인-및-디렉토리에셋-사전-준비)
-   * [Step 2: 단위 샌드박스 씬 (unit_test_models/phase01_u02_scene_unit_tron1_payload.xml) 직접 작성](#step-2-단위-샌드박스-씬-unit_test_modelsphase01_u02_scene_unit_tron1_payloadxml-직접-작성)
+   * [Step 2: 단위 샌드박스 씬 (xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml) 직접 작성](#step-2-단위-샌드박스-씬-xml_for_unit_testphase01_u02_scene_unit_tron1_payloadxml-직접-작성)
    * [Step 3: 적재 운반 및 도킹 검증 스크립트 (scripts_devel_roadmap/phase01_u02_test_tron1_payload.py) 직접 작성](#step-3-적재-운반-및-도킹-검증-스크립트-scripts_devel_roadmapphase01_u02_test_tron1_payloadpy-직접-작성)
    * [Step 4: 스크립트 실행 및 단위 검증 시나리오 실습](#step-4-스크립트-실행-및-단위-검증-시나리오-실습)
    * [Step 5: 인터랙티브 3D GUI 조작, 단축키 및 외란 복원력 테스트](#step-5-인터랙티브-3d-gui-조작-단축키-및-외란-복원력-테스트)
@@ -327,7 +327,7 @@ ls -l model_rl/tron1/encoder.onnx
 
 ---
 
-### Step 2: 단위 샌드박스 씬 (`unit_test_models/phase01_u02_scene_unit_tron1_payload.xml`) 직접 작성
+### Step 2: 단위 샌드박스 씬 (`xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`) 직접 작성
 
 U01 씬을 확장하여 다음 요소들이 완벽히 결합된 단독 단위 샌드박스 씬을 생성합니다:
 1. **Tron1 상체 3구 컵홀더 트레이 조립체** (`tray_assembly`): 림 높이 35mm, 직경 70mm 슬롯 3개(Slot L, Slot C, Slot R).
@@ -337,7 +337,7 @@ U01 씬을 확장하여 다음 요소들이 완벽히 결합된 단독 단위 �
 5. **범퍼 터치 센서** (`bumper_touch`): 접촉력 실시간 감지용.
 
 아래의 **전체 MJCF XML 코드(285줄)**를 복사하여 새 파일로 생성·저장합니다:
-* **생성 파일 경로:** `unit_test_models/phase01_u02_scene_unit_tron1_payload.xml`
+* **생성 파일 경로:** `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`
 
 ```xml
 <mujoco model="phase01_u02_unit_tron1_payload">
@@ -724,7 +724,7 @@ class U02Telemetry:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U02: Tron1 Payload Transport & Table Docking")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u02_scene_unit_tron1_payload.xml",
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml",
                         help="Path to Tron1 payload unit scene XML")
     parser.add_argument("--model_dir", type=str, default="model_rl/tron1",
                         help="Path to directory containing policy.onnx and encoder.onnx")

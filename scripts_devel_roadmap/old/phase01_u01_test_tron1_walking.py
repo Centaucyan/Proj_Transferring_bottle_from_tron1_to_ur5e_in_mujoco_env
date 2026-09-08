@@ -56,7 +56,7 @@ class Colors:
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 01-U01: Tron1 Spawn, Stand-Up & In-place Stepping")
     parser.add_argument("--headless", action="store_true", help="Run in headless text-only mode (no GUI window)")
-    parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u01_scene_unit_tron1.xml",
+    parser.add_argument("--xml", type=str, default="xml_for_unit_test/phase01_u01_scene_unit_tron1.xml",
                         help="Path to Tron1 unit scene XML")
     parser.add_argument("--max_time", type=float, default=20.0, help="Maximum simulation time limit in seconds (headless mode)")
     return parser.parse_args()
