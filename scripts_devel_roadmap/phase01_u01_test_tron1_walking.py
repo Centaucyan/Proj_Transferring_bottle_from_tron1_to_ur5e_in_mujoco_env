@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u01_scene_unit_tron1.xml",
                         help="Path to Tron1 unit scene XML")
     parser.add_argument("--target_x", type=float, default=1.0, help="Target docking X coordinate in meters")
-    parser.add_argument("--max_time", type=float, default=12.0, help="Maximum simulation time limit in seconds")
+    parser.add_argument("--max_time", type=float, default=30.0, help="Maximum simulation time limit in seconds")
     return parser.parse_args()
 
 class Tron1BipedController:
@@ -49,6 +49,7 @@ class Tron1BipedController:
             "abad_L_motor", "hip_L_motor", "knee_L_motor",
             "abad_R_motor", "hip_R_motor", "knee_R_motor"
         ]
+        
         self.act_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in self.actuator_names]
         self.base_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "base_Link")
 
