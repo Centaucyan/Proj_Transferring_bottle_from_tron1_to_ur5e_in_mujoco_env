@@ -1,0 +1,306 @@
+<mujoco model="phase01_u02_unit_tron1_payload">
+  <!-- 
+    ====================================================================
+    Phase 01-U02: Tron1 트레이 장착, 물병 적재 운반 및 테이블 도킹 정지 검증 씬
+    - LimX Dynamics Tron1 2족 보행 로봇 본체
+    - 상체 3구 컵홀더 트레이 (Slot L, Slot C, Slot R, Rim 높이 35mm)
+    - 상체 전면 완충 범퍼 (고마찰 고무 패드, 도킹 거치용)
+    - 스테이션 작업대 테이블 모서리 턱 (Docking Ledge, pos="0.85 0 0")
+    - 실제 물병 3개 (개당 150g, Freejoint, analytical collision cylinders)
+    - 범퍼 터치 센서 및 트레이 중심 모니터링 사이트 구비
+    ====================================================================
+  -->
+
+  <!-- 1. 컴파일러 설정: 각도 라디안, STL 및 OBJ 메쉬 경로 탐색 -->
+  <compiler angle="radian" coordinate="local" meshdir="../model_ori/PF_TRON1A/meshes/" autolimits="true"/>
+
+  <size njmax="1500" nconmax="400"/>
+
+  <!-- 2. 전역 물리 옵션 (dt=0.001s, 고속 안정 적분기, 타원 마찰 원뿔) -->
+  <option timestep="0.001" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic">
+    <flag contact="enable"/>
+  </option>
+
+  <!-- 3. 뷰어 및 시각화 기본 설정 -->
+  <visual>
+    <global offwidth="640" offheight="480" azimuth="135" elevation="-20"/>
+    <quality shadowsize="2048" offsamples="4"/>
+    <rgba com="0.2 0.8 0.2 0.6" contactforce="0.8 0.2 0.2 0.8"/>
+    <scale com="0.1" forcewidth="0.04" contactwidth="0.08"/>
+  </visual>
+
+  <!-- 4. 공통 에셋 (텍스처, 재질, 3D 메쉬) -->
+  <asset>
+    <!-- 하늘 배경 및 바닥 격자 체크 텍스처 -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
+    <texture name="texplane" type="2d" builtin="checker" rgb1="0.2 0.25 0.3" rgb2="0.3 0.35 0.4"
+             width="512" height="512" mark="cross" markrgb="0.8 0.8 0.8"/>
+    <material name="matplane" texture="texplane" texrepeat="5 5" texuniform="true" reflectance="0.1"/>
+
+    <!-- Tron1 STL 메쉬 에셋 -->
+    <mesh name="base_Link" file="base_Link.STL"/>
+    <mesh name="abad_L_Link" file="abad_L_Link.STL"/>
+    <mesh name="hip_L_Link" file="hip_L_Link.STL"/>
+    <mesh name="knee_L_Link" file="knee_L_Link.STL"/>
+    <mesh name="foot_L_Link" file="foot_L_Link.STL"/>
+    <mesh name="abad_R_Link" file="abad_R_Link.STL"/>
+    <mesh name="hip_R_Link" file="hip_R_Link.STL"/>
+    <mesh name="knee_R_Link" file="knee_R_Link.STL"/>
+    <mesh name="foot_R_Link" file="foot_R_Link.STL"/>
+
+    <!-- 물병 3D 메쉬 에셋 (OBJ) -->
+    <mesh name="bottle_mesh" file="../../bottle/bottle.obj"/>
+
+    <!-- 재질 정의 -->
+    <material name="robot_body_mat" rgba="0.82 0.85 0.90 1.0" specular="0.6" shininess="0.4"/>
+    <material name="robot_dark_mat" rgba="0.2 0.2 0.22 1.0" specular="0.4" shininess="0.3"/>
+    <material name="tray_mat" rgba="0.25 0.28 0.32 1.0" specular="0.5" shininess="0.4"/>
+    <material name="bumper_mat" rgba="0.12 0.12 0.14 1.0" specular="0.2" shininess="0.1"/>
+    <material name="table_mat" rgba="0.75 0.72 0.68 1.0" specular="0.3" shininess="0.2"/>
+    <material name="ledge_mat" rgba="0.2 0.2 0.22 1.0" specular="0.4" shininess="0.3"/>
+
+    <!-- 물병 색상 (식별을 위한 미세 색상 차이 부여) -->
+    <material name="bottle_mat_1" rgba="0.3 0.6 0.9 0.85" specular="0.7" shininess="0.6"/> <!-- Slot L: Blue -->
+    <material name="bottle_mat_2" rgba="0.3 0.85 0.5 0.85" specular="0.7" shininess="0.6"/> <!-- Slot C: Green -->
+    <material name="bottle_mat_3" rgba="0.95 0.6 0.2 0.85" specular="0.7" shininess="0.6"/> <!-- Slot R: Orange -->
+  </asset>
+
+  <!-- 5. 기본 충돌/시각 클래스 정의 -->
+  <default>
+    <default class="visual">
+      <geom contype="0" conaffinity="0" group="2" type="mesh"/>
+    </default>
+    <default class="collision">
+      <geom contype="1" conaffinity="1" condim="3" group="3" friction="1.0 0.005 0.0001"/>
+    </default>
+    <default class="bottle_collision">
+      <geom contype="1" conaffinity="1" condim="4" group="3" friction="1.2 0.005 0.0001"/>
+    </default>
+    <default class="bumper_collision">
+      <geom contype="1" conaffinity="1" condim="3" friction="1.5 0.01 0.001"
+            solref="0.04 1" solimp="0.8 0.95 0.001 0.5 2"/>
+    </default>
+    <joint armature="0.02" damping="0.05" limited="true"/>
+  </default>
+
+  <!-- 6. 월드 바디: 조명, 바닥, 도킹 테이블, Tron1 및 물병 -->
+  <worldbody>
+    <!-- 광원 -->
+    <light directional="true" pos="0 0 5" dir="0 0 -1" diffuse="0.8 0.8 0.8" castshadow="true"/>
+    <light directional="false" pos="3 -3 3" dir="-1 1 -1" diffuse="0.4 0.4 0.4"/>
+
+    <!-- 기준 바닥 평면 -->
+    <geom name="floor" type="plane" size="0 0 0.05" material="matplane"
+          contype="1" conaffinity="1" friction="1.0 0.005 0.0001" condim="3"/>
+
+    <!-- 카메라 시점 -->
+    <camera name="overview_cam" pos="2.4 -2.6 1.8" xyaxes="0.75 0.66 0.0 -0.25 0.28 0.92" fovy="45"/>
+    <camera name="docking_cam" pos="1.2 -1.2 1.0" xyaxes="0.707 0.707 0 -0.408 0.408 0.816" fovy="45"/>
+    <camera name="track_cam" mode="trackcom" pos="0 -2.4 1.2" xyaxes="1 0 0 0 0.5 0.86" fovy="50"/>
+
+    <!-- ==================== 도킹 스테이션 테이블 (pos="0.85 0 0") ==================== -->
+    <body name="docking_station" pos="0.85 0 0">
+      <!-- 테이블 상판 (두께 4cm, 상면 높이 z = 0.74m) -->
+      <geom name="table_top" type="box" pos="0.30 0 0.72" size="0.30 0.45 0.02" material="table_mat" class="collision"/>
+      <!-- 테이블 지지 다리 4개 -->
+      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
+      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
+      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
+      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
+
+      <!-- 
+        [도킹 완충 턱 (Docking Ledge)]
+        Tron1 범퍼(z ≈ 0.72m)를 완벽히 포용할 수 있도록 상하 16cm 높이의 대형 완충 턱 배치
+      -->
+      <geom name="table_bumper_ledge" type="box" pos="-0.05 0 0.71" size="0.03 0.25 0.08"
+            material="ledge_mat" class="bumper_collision"/>
+    </body>
+
+    <!-- ==================== TRON1 로봇 본체 (pos="0 0 0.80") ==================== -->
+    <body name="base_Link" pos="0 0 0.80">
+      <freejoint name="root_joint"/>
+      
+      <!-- 상체 관성 파라미터 (본체: 9.595kg) -->
+      <inertial pos="0.0457 0.0001 -0.1638" quat="0.9725 -0.0061 -0.2324 0.0039"
+                mass="9.595" diaginertia="0.1547 0.1109 0.0846"/>
+      <site name="imu_site" pos="0 0 0"/>
+      <geom class="visual" mesh="base_Link" material="robot_body_mat"/>
+      <geom name="base_col" type="box" size="0.135 0.13 0.095" pos="0.03 0 -0.072" class="collision"/>
+
+      <!-- 
+        [1. 상체 3구 컵홀더 트레이 조립체 (Tray Assembly)]
+        - base_Link 상단 장착 (pos="0.05 0 0.025")
+        - 슬롯 반경 0.035m (직경 70mm, 물병 직경 66mm 수용 공차 2mm)
+        - 슬롯 림 높이 35mm (지면 충격 시 물병 전도 및 이탈 원천 차단)
+      -->
+      <body name="tray_assembly" pos="0.05 0 0.025">
+        <!-- 트레이 바닥 지지판 (두께 8mm, 전후 12cm, 좌우 32cm) -->
+        <geom name="tray_base" type="box" pos="0 0 0.004" size="0.06 0.16 0.004"
+              material="tray_mat" class="collision"/>
+        <site name="tray_center_site" pos="0 0 0.01" size="0.008" rgba="1 1 0 1"/>
+
+        <!-- Slot 1 (좌측, Slot L: y = +0.09m) - 4면 가이드 림 벽체 (높이 50mm 견고한 지지) -->
+        <geom name="slot_L_wall_f" type="box" pos=" 0.036 0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_L_wall_b" type="box" pos="-0.036 0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_L_wall_l" type="box" pos=" 0 0.126 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_L_wall_r" type="box" pos=" 0 0.054 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <site name="slot_L_site" pos="0 0.09 0.01" size="0.005" rgba="0 0 1 1"/>
+
+        <!-- Slot 2 (중앙, Slot C: y = 0.00m) - 4면 가이드 림 벽체 -->
+        <geom name="slot_C_wall_f" type="box" pos=" 0.036 0.00 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_C_wall_b" type="box" pos="-0.036 0.00 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_C_wall_l" type="box" pos=" 0 0.036 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_C_wall_r" type="box" pos=" 0 -0.036 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <site name="slot_C_site" pos="0 0.00 0.01" size="0.005" rgba="0 1 0 1"/>
+
+        <!-- Slot 3 (우측, Slot R: y = -0.09m) - 4면 가이드 림 벽체 -->
+        <geom name="slot_R_wall_f" type="box" pos=" 0.036 -0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_R_wall_b" type="box" pos="-0.036 -0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_R_wall_l" type="box" pos=" 0 -0.054 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_R_wall_r" type="box" pos=" 0 -0.126 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <site name="slot_R_site" pos="0 -0.09 0.01" size="0.005" rgba="1 0.5 0 1"/>
+      </body>
+
+      <!-- 
+        [2. 상체 전면 완충 범퍼 조립체 (Front Bumper Assembly)]
+        - base_Link 전면 돌출 배치 (pos="0.17 0 -0.05")
+        - 고마찰 완충 고무 재질 실린더 (테이블 도킹 레지와 밀착 시 3점 지지 정적 평형 확립)
+      -->
+      <body name="bumper_assembly" pos="0.17 0 -0.05">
+        <geom name="front_bumper_col" type="cylinder" pos="0 0 0" euler="1.5708 0 0"
+              size="0.035 0.12" material="bumper_mat" class="bumper_collision"/>
+        <site name="bumper_site" pos="0.035 0 0" size="0.01" rgba="1 0 0 1"/>
+      </body>
+
+      <!-- ==================== LEFT LEG ==================== -->
+      <body name="abad_L_Link" pos="0.05556 0.105 -0.2602">
+        <inertial pos="-0.0697 0.0447 0.0005" quat="0.595 0.579 0.394 0.393" mass="1.469" diaginertia="0.0025 0.0020 0.0013"/>
+        <joint name="abad_L_Joint" axis="1 0 0" range="-0.38 1.39"/>
+        <geom class="visual" mesh="abad_L_Link" material="robot_body_mat"/>
+        <geom name="abad_L_col" type="cylinder" pos="-0.08 0 0" euler="1.57 0 0" size="0.05 0.025" class="collision"/>
+
+        <body name="hip_L_Link" pos="-0.077 0.0205 0">
+          <inertial pos="-0.0286 -0.0477 -0.0399" quat="0.853 0.192 0.226 0.426" mass="2.3" diaginertia="0.0233 0.0230 0.0027"/>
+          <joint name="hip_L_Joint" axis="0 1 0" range="-1.01 1.39"/>
+          <geom class="visual" mesh="hip_L_Link" material="robot_dark_mat"/>
+          <geom name="hip_L_col" type="cylinder" pos="-0.1 -0.02 -0.14" euler="0 0.53 0" size="0.035 0.09" class="collision"/>
+
+          <body name="knee_L_Link" pos="-0.15 -0.0205 -0.25981">
+            <inertial pos="0.0516 0.0015 -0.0814" quat="0.668 -0.202 -0.199 0.687" mass="0.55" diaginertia="0.0041 0.0041 0.0001"/>
+            <joint name="knee_L_Joint" axis="0 -1 0" range="-0.87 1.36"/>
+            <geom class="visual" mesh="knee_L_Link" material="robot_body_mat"/>
+            <geom name="knee_L_col" type="cylinder" pos="0.078 0 -0.12" euler="0 -0.55 0" size="0.015 0.13" class="collision"/>
+            <geom name="knee_L_cap_col" type="sphere" pos="0 0 0" size="0.032" class="collision"/>
+
+            <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_L_Link" material="robot_dark_mat"/>
+            <geom name="foot_L_col" type="sphere" pos="0.150 0 -0.2598" size="0.032" class="collision"
+                  friction="1.2 0.005 0.0001"/>
+            <site name="foot_L_site" pos="0.150 0 -0.2598" size="0.01" rgba="1 0 0 1"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- ==================== RIGHT LEG ==================== -->
+      <body name="abad_R_Link" pos="0.05556 -0.105 -0.2602">
+        <inertial pos="-0.0697 -0.0447 0.0005" quat="0.393 0.394 0.579 0.595" mass="1.469" diaginertia="0.0025 0.0020 0.0013"/>
+        <joint name="abad_R_Joint" axis="1 0 0" range="-1.39 0.38"/>
+        <geom class="visual" mesh="abad_R_Link" material="robot_body_mat"/>
+        <geom name="abad_R_col" type="cylinder" pos="-0.08 0 0" euler="1.57 0 0" size="0.05 0.025" class="collision"/>
+
+        <body name="hip_R_Link" pos="-0.077 -0.0205 0">
+          <inertial pos="-0.0286 0.0477 -0.0399" quat="0.426 0.226 0.192 0.853" mass="2.3" diaginertia="0.0233 0.0230 0.0027"/>
+          <joint name="hip_R_Joint" axis="0 -1 0" range="-1.39 1.01"/>
+          <geom class="visual" mesh="hip_R_Link" material="robot_dark_mat"/>
+          <geom name="hip_R_col" type="cylinder" pos="-0.10 0.025 -0.14" euler="0 0.53 0" size="0.035 0.09" class="collision"/>
+
+          <body name="knee_R_Link" pos="-0.15 0.0205 -0.25981">
+            <inertial pos="0.0516 -0.0015 -0.0814" quat="0.687 -0.199 -0.202 0.668" mass="0.55" diaginertia="0.0041 0.0041 0.0001"/>
+            <joint name="knee_R_Joint" axis="0 1 0" range="-1.36 0.87"/>
+            <geom class="visual" mesh="knee_R_Link" material="robot_body_mat"/>
+            <geom name="knee_R_col" type="cylinder" pos="0.078 0 -0.12" euler="0 -0.55 0" size="0.015 0.13" class="collision"/>
+            <geom name="knee_R_cap_col" type="sphere" pos="0 0 0" size="0.032" class="collision"/>
+
+            <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_R_Link" material="robot_dark_mat"/>
+            <geom name="foot_R_col" type="sphere" pos="0.150 0 -0.2598" size="0.032" class="collision"
+                  friction="1.2 0.005 0.0001"/>
+            <site name="foot_R_site" pos="0.150 0 -0.2598" size="0.01" rgba="0 0 1 1"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- ==================== 물병 1 (Slot L: 좌측 적재) ==================== -->
+    <body name="bottle_1" pos="0.05 0.09 0.835">
+      <freejoint name="bottle_1_joint"/>
+      <inertial pos="0 0 0.075" mass="0.15" diaginertia="0.0004 0.0004 0.00015"/>
+      <geom name="bottle_1_vis" type="mesh" mesh="bottle_mesh" material="bottle_mat_1"
+            contype="0" conaffinity="0" group="1"/>
+      <geom name="bottle_1_col_body" class="bottle_collision" type="cylinder" pos="0 0 0.058" size="0.033 0.055"/>
+      <geom name="bottle_1_col_shoulder" class="bottle_collision" type="cylinder" pos="0 0 0.125" size="0.024 0.015"/>
+      <geom name="bottle_1_col_neck" class="bottle_collision" type="cylinder" pos="0 0 0.1575" size="0.0155 0.0175"/>
+    </body>
+
+    <!-- ==================== 물병 2 (Slot C: 중앙 적재) ==================== -->
+    <body name="bottle_2" pos="0.05 0.00 0.835">
+      <freejoint name="bottle_2_joint"/>
+      <inertial pos="0 0 0.075" mass="0.15" diaginertia="0.0004 0.0004 0.00015"/>
+      <geom name="bottle_2_vis" type="mesh" mesh="bottle_mesh" material="bottle_mat_2"
+            contype="0" conaffinity="0" group="1"/>
+      <geom name="bottle_2_col_body" class="bottle_collision" type="cylinder" pos="0 0 0.058" size="0.033 0.055"/>
+      <geom name="bottle_2_col_shoulder" class="bottle_collision" type="cylinder" pos="0 0 0.125" size="0.024 0.015"/>
+      <geom name="bottle_2_col_neck" class="bottle_collision" type="cylinder" pos="0 0 0.1575" size="0.0155 0.0175"/>
+    </body>
+
+    <!-- ==================== 물병 3 (Slot R: 우측 적재) ==================== -->
+    <body name="bottle_3" pos="0.05 -0.09 0.835">
+      <freejoint name="bottle_3_joint"/>
+      <inertial pos="0 0 0.075" mass="0.15" diaginertia="0.0004 0.0004 0.00015"/>
+      <geom name="bottle_3_vis" type="mesh" mesh="bottle_mesh" material="bottle_mat_3"
+            contype="0" conaffinity="0" group="1"/>
+      <geom name="bottle_3_col_body" class="bottle_collision" type="cylinder" pos="0 0 0.058" size="0.033 0.055"/>
+      <geom name="bottle_3_col_shoulder" class="bottle_collision" type="cylinder" pos="0 0 0.125" size="0.024 0.015"/>
+      <geom name="bottle_3_col_neck" class="bottle_collision" type="cylinder" pos="0 0 0.1575" size="0.0155 0.0175"/>
+    </body>
+  </worldbody>
+
+  <!-- 7. 액추에이터 정의: 6개 모터 직접 토크 제어 (LimX 공식 규격: [-80, 80] Nm) -->
+  <actuator>
+    <motor name="abad_L_motor" joint="abad_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="hip_L_motor"  joint="hip_L_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="knee_L_motor" joint="knee_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="abad_R_motor" joint="abad_R_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="hip_R_motor"  joint="hip_R_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="knee_R_motor" joint="knee_R_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+  </actuator>
+
+  <!-- 8. 센서 정의: IMU, 관절 엔코더 및 전면 범퍼 터치 센서 -->
+  <sensor>
+    <framequat name="imu_quat" objtype="site" objname="imu_site"/>
+    <gyro name="imu_gyro" site="imu_site"/>
+    <accelerometer name="imu_acc" site="imu_site"/>
+    <touch name="bumper_touch" site="bumper_site"/>
+    <jointpos name="pos_abad_L" joint="abad_L_Joint"/>
+    <jointpos name="pos_hip_L"  joint="hip_L_Joint"/>
+    <jointpos name="pos_knee_L" joint="knee_L_Joint"/>
+    <jointpos name="pos_abad_R" joint="abad_R_Joint"/>
+    <jointpos name="pos_hip_R"  joint="hip_R_Joint"/>
+    <jointpos name="pos_knee_R" joint="knee_R_Joint"/>
+    <jointvel name="vel_abad_L" joint="abad_L_Joint"/>
+    <jointvel name="vel_hip_L"  joint="hip_L_Joint"/>
+    <jointvel name="vel_knee_L" joint="knee_L_Joint"/>
+    <jointvel name="vel_abad_R" joint="abad_R_Joint"/>
+    <jointvel name="vel_hip_R"  joint="hip_R_Joint"/>
+    <jointvel name="vel_knee_R" joint="knee_R_Joint"/>
+  </sensor>
+
+  <!-- 9. 기본 안정 기립 키프레임 -->
+  <keyframe>
+    <!-- Tron1 직립 스폰 자세 및 물병 3개 트레이 적재 기본 상태 -->
+    <key name="stand" qpos="
+      0 0 0.80 1 0 0 0 0.0 0.0 0.0 0.0 0.0 0.0
+      0.05  0.09 0.835 1 0 0 0
+      0.05  0.00 0.835 1 0 0 0
+      0.05 -0.09 0.835 1 0 0 0
+    "/>
+  </keyframe>
+</mujoco>
