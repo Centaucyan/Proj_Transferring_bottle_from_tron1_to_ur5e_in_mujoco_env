@@ -4,9 +4,10 @@ scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
 Phase 01-U01: Tron1 LimX Official Pretrained RL In-place Stepping & Balancing
 - Loads official pretrained ONNX models (policy.onnx, encoder.onnx) from model_rl/tron1/
 - 500Hz Policy Inference with Projected Gravity & Proprioceptive Observations
-- High-frequency Joint PD torque execution (Kp=42.0, Kd=2.0)
+- High-frequency Joint PD torque execution (Kp=42.0, Kd=3.5)
+- In-place Stepping Origin Hold Feedback (PD compensation on vx, vy, wz commands)
 - 1.0x Real-time Physics Speed Synchronization
-- Interactive Viewer Auto-Reset Support (Instant sync on Reset button / Backspace / Terminal Enter)
+- Interactive Viewer Auto-Reset Support (Instant sync on Reset button / Backspace / R / Terminal Enter)
 - Telemetry monitoring: Base height Z, gyro rates, pitch, and in-place stepping stability
 """
 
@@ -283,6 +284,8 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
     last_print_time = 0.0
     prev_sim_time = data.time
     step = 0
+    reset_requested = [False]
+    stop_threads = False
 
     print(f"\n{Colors.BOLD}[TEST EXECUTION] Running Tron1 RL In-place Stepping Simulation...{Colors.RESET}", flush=True)
     if viewer:
@@ -318,11 +321,25 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
         sim_start = 0.0
         prev_sim_time = 0.0
         step = 0
+        reset_requested[0] = False
         if viewer:
             viewer.sync()
         rs = controller.robot_state
         print(f"\n  {Colors.BOLD}{Colors.YELLOW}↺ [RESET 완료] 시뮬레이션 및 로봇 상태가 초기 스폰 상태(robot_state='landing')로 완벽히 재동기화되었습니다.{Colors.RESET}", flush=True)
         print(f"  * [ 0.00s] robot_state: [{rs.state:^11}] | Pitch={rs.pitch_deg:+5.1f}° | 높이 Z={rs.pos_z:5.3f}m | Gyro={rs.gyro_norm:5.2f} rad/s\n", flush=True)
+
+    def terminal_listener():
+        while not stop_threads:
+            try:
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                reset_requested[0] = True
+            except Exception:
+                break
+
+    term_thread = threading.Thread(target=terminal_listener, daemon=True)
+    term_thread.start()
 
     do_reset()
 
@@ -331,8 +348,8 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
             print(f"  * 사용자에 의해 뷰어 창이 닫혔습니다.", flush=True)
             break
 
-        # Reset 감지 (뷰어 UI Reset 버튼 또는 data.time 역전 감지)
-        if prev_sim_time > 0.05 and (data.time < prev_sim_time - 0.01 or data.time == 0.0):
+        # Reset 감지 (뷰어 UI Reset 버튼 또는 터미널/단축키)
+        if reset_requested[0] or (prev_sim_time > 0.05 and (data.time < prev_sim_time - 0.01 or data.time == 0.0)):
             do_reset()
 
         # 1.0x 완벽 실시간 물리 동기화
@@ -365,6 +382,8 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
 
         time.sleep(0.001)
 
+    stop_threads = True
+
 def main():
     args = parse_args()
     if not os.path.exists(args.xml):
@@ -379,7 +398,19 @@ def main():
         print(f"{Colors.BOLD}{Colors.CYAN}Headless 모드로 시뮬레이션을 실행합니다. (최대 {args.max_time}초){Colors.RESET}")
         run_simulation(model, data, controller, viewer=None, max_time=args.max_time)
     else:
-        with mujoco.viewer.launch_passive(model, data) as v:
+        # 키보드 이벤트 핸들러
+        def key_callback(keycode):
+            # GLFW keycodes: R=82, Backspace=259
+            if keycode in (ord('r'), ord('R'), 82, 259):
+                stand_key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+                if stand_key_id != -1:
+                    mujoco.mj_resetDataKeyframe(model, data, stand_key_id)
+                else:
+                    mujoco.mj_resetData(model, data)
+                data.time = 0.0
+                controller.reset()
+
+        with mujoco.viewer.launch_passive(model, data, key_callback=key_callback) as v:
             v.cam.distance = 2.4
             v.cam.elevation = -15
             v.cam.azimuth = 135

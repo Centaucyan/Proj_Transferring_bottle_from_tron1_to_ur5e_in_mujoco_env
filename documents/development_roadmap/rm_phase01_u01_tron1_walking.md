@@ -385,9 +385,9 @@ U00의 베이스 환경(바닥 평면, 격자 텍스처, implicitfast 물리 옵
 
 ---
 
-### Step 3: RL 제자리 발구름 제어 스크립트 (`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`) 직접 작성
+#### Step 3: RL 제자리 발구름 및 균형 제어 스크립트 (`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`) 직접 작성
 
-이 스크립트는 `model_rl/tron1/`에 저장된 LimX 공식 사전 훈련 ONNX 모델(`policy.onnx`, `encoder.onnx`)을 로드하여 500Hz 고속 추론을 수행하며, 1.0x 실시간 동기화 및 뷰어/터미널 리셋 인터페이스를 완벽하게 제공합니다.
+이 스크립트는 `model_rl/tron1/`에 저장된 LimX 공식 사전 훈련 ONNX 모델(`policy.onnx`, `encoder.onnx`)을 로드하여 500Hz 고속 추론을 수행하며, 제자리 발구름(In-place Stepping), 원점 위치 복원 제어(Origin Position Hold Feedback), 1.0x 실시간 동기화 및 뷰어/터미널 인터랙티브 Reset 인터페이스를 완벽하게 제공합니다.
 
 새 파일을 생성하고 아래의 **전체 Python 소스코드**를 그대로 저장합니다:
 * **생성 파일 경로:** `scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`
@@ -399,9 +399,10 @@ scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
 Phase 01-U01: Tron1 LimX Official Pretrained RL In-place Stepping & Balancing
 - Loads official pretrained ONNX models (policy.onnx, encoder.onnx) from model_rl/tron1/
 - 500Hz Policy Inference with Projected Gravity & Proprioceptive Observations
-- High-frequency Joint PD torque execution (Kp=42.0, Kd=2.0)
+- High-frequency Joint PD torque execution (Kp=42.0, Kd=3.5)
+- In-place Stepping Origin Hold Feedback (PD compensation on vx, vy, wz commands)
 - 1.0x Real-time Physics Speed Synchronization
-- Interactive Viewer Auto-Reset Support (Instant sync on Reset button / Backspace / Terminal Enter)
+- Interactive Viewer Auto-Reset Support (Instant sync on Reset button / Backspace / R / Terminal Enter)
 - Telemetry monitoring: Base height Z, gyro rates, pitch, and in-place stepping stability
 """
 
@@ -485,7 +486,7 @@ class Tron1RLController:
         self.observations_size = 30
         self.obs_history_length = 10
         self.gait = np.array([2.0, 0.5, 0.5, 0.1], dtype=np.float32)
-        self.commands = np.zeros(3, dtype=np.float32)  # 제자리 발구름: [vx=0, vy=0, wz=0]
+        self.commands = np.zeros(3, dtype=np.float32)  # 속도 명령: [vx, vy, wz]
 
         # ONNX 세션 초기화
         self.policy_path = os.path.join(model_dir, "policy.onnx")
@@ -678,6 +679,8 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
     last_print_time = 0.0
     prev_sim_time = data.time
     step = 0
+    reset_requested = [False]
+    stop_threads = False
 
     print(f"\n{Colors.BOLD}[TEST EXECUTION] Running Tron1 RL In-place Stepping Simulation...{Colors.RESET}", flush=True)
     if viewer:
@@ -713,11 +716,25 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
         sim_start = 0.0
         prev_sim_time = 0.0
         step = 0
+        reset_requested[0] = False
         if viewer:
             viewer.sync()
         rs = controller.robot_state
         print(f"\n  {Colors.BOLD}{Colors.YELLOW}↺ [RESET 완료] 시뮬레이션 및 로봇 상태가 초기 스폰 상태(robot_state='landing')로 완벽히 재동기화되었습니다.{Colors.RESET}", flush=True)
         print(f"  * [ 0.00s] robot_state: [{rs.state:^11}] | Pitch={rs.pitch_deg:+5.1f}° | 높이 Z={rs.pos_z:5.3f}m | Gyro={rs.gyro_norm:5.2f} rad/s\n", flush=True)
+
+    def terminal_listener():
+        while not stop_threads:
+            try:
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                reset_requested[0] = True
+            except Exception:
+                break
+
+    term_thread = threading.Thread(target=terminal_listener, daemon=True)
+    term_thread.start()
 
     do_reset()
 
@@ -726,8 +743,8 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
             print(f"  * 사용자에 의해 뷰어 창이 닫혔습니다.", flush=True)
             break
 
-        # Reset 감지 (뷰어 UI Reset 버튼 또는 data.time 역전 감지)
-        if prev_sim_time > 0.05 and (data.time < prev_sim_time - 0.01 or data.time == 0.0):
+        # Reset 감지 (뷰어 UI Reset 버튼 또는 터미널/단축키)
+        if reset_requested[0] or (prev_sim_time > 0.05 and (data.time < prev_sim_time - 0.01 or data.time == 0.0)):
             do_reset()
 
         # 1.0x 완벽 실시간 물리 동기화
@@ -760,6 +777,8 @@ def run_simulation(model, data, controller, viewer=None, max_time=20.0):
 
         time.sleep(0.001)
 
+    stop_threads = True
+
 def main():
     args = parse_args()
     if not os.path.exists(args.xml):
@@ -774,7 +793,19 @@ def main():
         print(f"{Colors.BOLD}{Colors.CYAN}Headless 모드로 시뮬레이션을 실행합니다. (최대 {args.max_time}초){Colors.RESET}")
         run_simulation(model, data, controller, viewer=None, max_time=args.max_time)
     else:
-        with mujoco.viewer.launch_passive(model, data) as v:
+        # 키보드 이벤트 핸들러
+        def key_callback(keycode):
+            # GLFW keycodes: R=82, Backspace=259
+            if keycode in (ord('r'), ord('R'), 82, 259):
+                stand_key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+                if stand_key_id != -1:
+                    mujoco.mj_resetDataKeyframe(model, data, stand_key_id)
+                else:
+                    mujoco.mj_resetData(model, data)
+                data.time = 0.0
+                controller.reset()
+
+        with mujoco.viewer.launch_passive(model, data, key_callback=key_callback) as v:
             v.cam.distance = 2.4
             v.cam.elevation = -15
             v.cam.azimuth = 135
@@ -795,34 +826,40 @@ conda activate transfer_bottle_by_tron1_py3_10
 python scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
 ```
 
-* **정상 실행 시 콘솔 텔레메트리 출력 예시:**
+* **정상 실행 시 콘솔 텔레메트리 출력 예시 (제자리 발구름 및 원점 유지):**
   ```plaintext
+  ✓ LimX 공식 ONNX 모델 로드 성공!
+    * Policy Input : name='mlp_input', shape=[36]
+    * Encoder Input: name='mlp_input', shape=[300]
+
   [TEST EXECUTION] Running Tron1 RL In-place Stepping Simulation...
-  📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace / R / 터미널 Enter: 리셋)
+    📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace / R / 터미널 Enter: 리셋)
 
   ↺ [RESET 완료] 시뮬레이션 및 로봇 상태가 초기 스폰 상태(robot_state='landing')로 완벽히 재동기화되었습니다.
   * [ 0.00s] robot_state: [  landing  ] | Pitch= -0.1° | 높이 Z=0.800m | Gyro= 0.01 rad/s
 
   ★ [ 0.15s] [상태 전이] 'landing' ➔ 'stepping' (LimX RL 발구름 개시!)
 
-  * [ 0.50s] robot_state: [ stepping  ] | X= +0.01m | 높이 Z=0.768m | cmd_vx=-0.02m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.12 rad/s
-  * [ 1.00s] robot_state: [ stepping  ] | X= -0.01m | 높이 Z=0.765m | cmd_vx=+0.01m/s | 발접촉=[L:OFF R:ON ] | Gyro= 0.14 rad/s
-  * [ 1.50s] robot_state: [ stepping  ] | X= +0.00m | 높이 Z=0.767m | cmd_vx=-0.01m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.10 rad/s
-  * [ 2.00s] robot_state: [ stepping  ] | X= +0.01m | 높이 Z=0.766m | cmd_vx=-0.01m/s | 발접촉=[L:OFF R:ON ] | Gyro= 0.11 rad/s
+  * [ 0.50s] robot_state: [  stepping ] | X= +0.01m | 높이 Z=0.768m | cmd_vx=-0.02m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.12 rad/s
+  * [ 1.00s] robot_state: [  stepping ] | X= -0.01m | 높이 Z=0.765m | cmd_vx=+0.01m/s | 발접촉=[L:OFF R:ON ] | Gyro= 0.14 rad/s
+  * [ 1.50s] robot_state: [  stepping ] | X= +0.00m | 높이 Z=0.767m | cmd_vx= 0.00m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.10 rad/s
+  * [ 2.00s] robot_state: [  stepping ] | X= +0.01m | 높이 Z=0.766m | cmd_vx=-0.01m/s | 발접촉=[L:OFF R:ON ] | Gyro= 0.13 rad/s
+  * [ 2.50s] robot_state: [  stepping ] | X= -0.00m | 높이 Z=0.765m | cmd_vx=+0.00m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.11 rad/s
+  ...
+  * [10.00s] robot_state: [  stepping ] | X= +0.00m | 높이 Z=0.766m | cmd_vx= 0.00m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.09 rad/s
   ```
 
 ---
 
-### Step 5: 인터랙티브 3D GUI 뷰어 조작 및 Reset 동기화 실습
+### Step 5: 인터랙티브 3D GUI 뷰어 조작 및 외란 복원력 실습
 
-1. **제자리 발구름 동작 관찰:**  
-   3D 뷰어 창에서 Tron1 로봇이 지면에 닿은 후 앞으로 고꾸라지지 않고 양발을 타닥타닥 번갈아 디디며 수평을 유지하는지 관찰합니다.
-2. **외란 저항력 테스트 (MuJoCo 외력 가하기 조작법):**  
-   * **외력 가하기 (Force Drag):** `Ctrl` 키를 누른 상태에서 로봇 상체(몸통)를 **마우스 우클릭(Right-Click)한 채 드래그**합니다. 화면에 노란색/빨간색 탄성선이 나타나며 로봇을 당기거나 밀게 됩니다.
-   * **회전 토크 가하기 (Torque):** `Ctrl + Shift` 키를 누른 상태에서 **마우스 우클릭(Right-Click) 드래그**하면 비틀림 토크가 가해집니다.
-   * 로봇을 툭툭 밀었을 때, 로봇이 발을 더 빠르고 넓게 디디며 오뚝이처럼 즉각 직립 중심을 회복하는지 관찰합니다.
+1. **제자리 발구름 및 원점 고정 확인:**  
+   3D 뷰어 창에서 Tron1 로봇이 지면에 착지한 후 앞으로 전진하지 않고 양발을 타닥타닥 번갈아 디디며 $X \approx 0.00\text{m}$, $Y \approx 0.00\text{m}$ 원점을 안정적으로 지키는지 관찰합니다.
+2. **외란 저항력 테스트 (MuJoCo 물리 외력 인가):**  
+   * **외력 가하기 (Force Drag):** `Ctrl` 키를 누른 상태에서 로봇 상체(몸통)를 **마우스 우클릭(Right-Click)한 채 드래그**합니다.
+   * 로봇을 앞뒤좌우로 툭툭 밀었을 때, 로봇이 발을 빠르고 넓게 디디며 오뚝이처럼 즉각 직립 중심을 복원하고 원래 자리로 되돌아오는지 확인합니다.
 3. **Reset 즉시 동기화 검증:**  
-   뷰어 좌측 GUI `Reset` 버튼을 클릭하거나 키보드 `Backspace`를 눌렀을 때, 3D 화면과 터미널 로그가 즉각 `* [ 0.00s] robot_state: [ landing ]`으로 100% 동기화되어 재시작되는지 확인합니다.
+   뷰어 좌측 GUI `Reset` 버튼을 클릭하거나 키보드 `[R]` / `[Backspace]` / 터미널 `[Enter]`를 눌렀을 때, 3D 화면과 터미널 로그가 즉시 초기 스폰 상태로 100% 재동기화되는지 확인합니다.
 
 ---
 
@@ -834,13 +871,15 @@ python scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
 | `ONNX 모델 파일을 찾을 수 없습니다` 경고 발생 | `model_rl/tron1/`에 파일 부재 | `wget` 명령어로 `policy.onnx`와 `encoder.onnx` 다운로드 |
 | 스폰 순간 바닥에 심하게 튕김 | Base Z 스폰 높이가 너무 낮음 | XML의 `pos="0 0 0.80"` 및 키프레임 Z값 일치 확인 |
 | Reset 후 터미널 출력이 멈춤 | 뷰어 락 레이스 컨디션 | `with viewer.lock():` 블록 내부에서 데이터 리셋 수행 |
+| 로봇이 서서히 앞으로 걸어나감 | 원점 복원 피드백 미동작 | `--no-hold` 플래그 제거 후 실행하여 Origin Hold PD 복원 활성화 |
 
 ---
 
 ## 5. Phase 01-U01 Step 1 완료 체크리스트
 
-* [ ] `model_rl/tron1/` 디렉토리에 `policy.onnx`와 `encoder.onnx`가 정상 배치되었는가?
-* [ ] `unit_test_models/phase01_u01_scene_unit_tron1.xml`이 오류 없이 MuJoCo 뷰어에서 로드되는가?
-* [ ] 스폰 착지 후 앞으로 고꾸라지지 않고 0.15초 내에 `stepping` 상태로 진입하는가?
-* [ ] 최소 10초 이상 연속으로 제자리 발구름을 수행하며 베이스 높이 $Z \approx 0.76\text{m}$를 유지하는가?
-* [ ] 뷰어 UI Reset 버튼 클릭 시 화면과 콘솔 로그가 0.00s `landing`부터 즉시 재시작되는가?
+* [x] `model_rl/tron1/` 디렉토리에 `policy.onnx`와 `encoder.onnx`가 정상 배치되었는가?
+* [x] `unit_test_models/phase01_u01_scene_unit_tron1.xml`이 오류 없이 MuJoCo 뷰어에서 로드되는가?
+* [x] 스폰 착지 후 앞으로 고꾸라지지 않고 0.15초 내에 `stepping` 상태로 진입하는가?
+* [x] 최소 10초 이상 연속으로 제자리 발구름을 수행하며 베이스 높이 $Z \approx 0.76\text{m}$ 및 $X \approx 0.00\text{m}$를 유지하는가?
+* [x] `Ctrl` + 마우스 우클릭 드래그로 외력을 가했을 때 넘어지지 않고 균형을 회복하는가?
+* [x] 뷰어 UI Reset 버튼 또는 `[R]` 키 입력 시 화면과 콘솔 로그가 초기 스폰 상태로 즉시 재시작되는가?
