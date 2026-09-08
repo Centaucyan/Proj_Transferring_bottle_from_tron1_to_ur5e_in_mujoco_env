@@ -85,9 +85,9 @@
 
     <!-- 
       [Tron1 로봇 모델 본체]
-      초기 스폰 위치: pos="0 0 0.7" (다리를 살짝 굽혔을 때 발끝이 지면에 정렬되는 안정 스폰 높이)
+      초기 스폰 위치: pos="0 0 0.80" (직립 다리 길이 0.78m 대비 약 2cm 부드러운 지면 안착 높이)
     -->
-    <body name="base_Link" pos="0 0 0.7">
+    <body name="base_Link" pos="0 0 0.80">
       <!-- 6-DOF 자유 관절 (공간 상을 자유롭게 이동 및 회전) -->
       <freejoint name="root_joint"/>
       
@@ -160,14 +160,14 @@
     </body>
   </worldbody>
 
-  <!-- 7. 액추에이터 정의: 6개 모터 직접 토크 제어 ([-80, 80] Nm) -->
+  <!-- 7. 액추에이터 정의: 6개 모터 직접 토크 제어 (LimX 공식 규격: [-80, 80] Nm) -->
   <actuator>
-    <motor name="abad_L_motor" joint="abad_L_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor name="hip_L_motor"  joint="hip_L_Joint"  gear="1" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor name="knee_L_motor" joint="knee_L_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor name="abad_R_motor" joint="abad_R_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor name="hip_R_motor"  joint="hip_R_Joint"  gear="1" ctrllimited="true" ctrlrange="-60 60"/>
-    <motor name="knee_R_motor" joint="knee_R_Joint" gear="1" ctrllimited="true" ctrlrange="-60 60"/>
+    <motor name="abad_L_motor" joint="abad_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="hip_L_motor"  joint="hip_L_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="knee_L_motor" joint="knee_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="abad_R_motor" joint="abad_R_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="hip_R_motor"  joint="hip_R_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="knee_R_motor" joint="knee_R_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
   </actuator>
 
   <!-- 8. 센서 정의: IMU 및 6개 관절 엔코더 -->
@@ -191,7 +191,7 @@
 
   <!-- 9. 기본 안정 기립 키프레임 (뷰어 리셋 시 기본 자세 자동 복원) -->
   <keyframe>
-    <!-- <key name="stand" qpos="0 0 0.8 1 0 0 0 0.0 0.40 0.65 0.0 -0.40 -0.65"/> -->
-    <key name="stand" qpos="0 0 0.55 1 0 0 0 0.0 0.3 1.25 0.0 -0.3 -1.25"/>
+    <!-- 직립 기립 자세(Standing Pose): Base Z = 0.80m, Straight Stance (전 관절 0.0 rad) -->
+    <key name="stand" qpos="0 0 0.80 1 0 0 0 0.0 0.0 0.0 0.0 0.0 0.0"/>
   </keyframe>
 </mujoco>

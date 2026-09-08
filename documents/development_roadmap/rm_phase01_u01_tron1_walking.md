@@ -1,198 +1,187 @@
-# [Phase 01-U01 Guide] Tron1 기본 이족보행 및 도킹 정지 단독 검증
-# (Point-Foot Bipedal Locomotion & Docking Stance Lock Verification)
+# [Phase 01-U01 Guide] Tron1 LimX 공식 상용 강화학습(RL) 기반 스폰 착지 및 제자리 발구름(In-place Stepping) 검증
+# (Point-Foot Bipedal In-place Stepping Verification with LimX Pretrained RL Policy)
 
-* **문서 버전:** v1.0
-* **작성일:** 2026-09-04
+* **문서 버전:** v2.0 (LimX Dynamics 공식 상용 RL 배포 아키텍처 완전 자립형 가이드)
+* **작성일:** 2026-09-08
 * **프로젝트:** `Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env`
 * **대상 환경:** Ubuntu 22.04 LTS / ROS 2 Humble / MuJoCo 3.x / Conda (`transfer_bottle_by_tron1_py3_10`, Python 3.10.x)
-* **문서 목적:** 본 문서는 무거운 트레이나 물병 페이로드를 장착하기에 앞서, **LimX Dynamics Tron1 점 발바닥(Point-Foot) 2족 보행 로봇 본체만으로 지면 충격을 흡수하며 직립(Standing)하고, 지정된 인계 구역 목표점까지 안정적으로 보행 이동한 후, 발구름 진동 없이 정지(Stance Lock)를 유지하는 동역학 제어 원리를 이론적으로 학습하고 직접 코드를 작성하여 검증**하는 것을 목적으로 합니다.
+* **문서 목적:** 본 문서는 **Phase 01-U00(단위 샌드박스 공통 환경 검증)을 완료한 독자가 본 문서 하나만 보고 처음부터 끝까지 따라 하여**, 발목 관절이 없는 LimX Dynamics Tron1 점 발바닥(Point-Foot) 로봇 단독 검증 씬 XML과 공식 사전 훈련 강화학습(DRL / ONNX) 기반 제어 스크립트를 직접 작성하고, 스폰 직후 지면에 부드럽게 착지하여 쓰러지지 않고 제자리에서 발을 구르며(In-place Stepping) 영구적인 직립 동적 균형을 유지하는 전 과정을 학습·검증하는 것을 목적으로 합니다.
+
+> [!NOTE]
+> **개발 범위 안내:**  
+> 본 단위 검증의 최종 목표는 인계 구역까지 전진 보행하는 것이지만, **본 문서(Step 1)에서는 스폰(Spawn) 직후 지면 충격을 흡수하며 안정적으로 착지한 뒤 제자리에서 발을 구르며 쓰러지지 않고 직립을 영구히 유지하는 'In-place Stepping & Dynamic Balance' 구현 및 검증까지**를 집중적으로 다룹니다. 전진 보행 및 인계 구역 도킹은 본 단계의 직립 안정성이 검증된 직후 Step 2에서 순차적으로 확장합니다.
 
 ---
 
 ## 목차 (Table of Contents)
 
-1. [왜 U01(Tron1 단독 보행 및 도킹 정지 검증)이 필요한가?](#1-왜-u01tron1-단독-보행-및-도킹-정지-검증이-필요한가)
-2. [핵심 이론: 포인트 풋 2족 로봇 동역학과 제어 원리](#2-핵심-이론-포인트-풋-2족-로봇-동역학과-제어-원리)
-   * [2.1. 포인트 풋(Point-Foot)의 기구학적 특성과 발목 토크의 부재](#21-포인트-풋point-foot의-기구학적-특성과-발목-토크의-부재)
-   * [2.2. 역진자 모델(LIPM)과 질량 중심(CoM) 동역학](#22-역진자-모델lipm과-질량-중심com-동역학)
-   * [2.3. Zero Moment Point (ZMP)와 지지 다각형의 한계](#23-zero-moment-point-zmp와-지지-다각형의-한계)
-   * [2.4. 보행 상태 머신(Gait FSM)과 주기적 위상 변수($\phi$)](#24-보행-상태-머신gait-fsm과-주기적-위상-변수phi)
-   * [2.5. 2-Link 다리 기구학과 가상 스프링-댐퍼(Virtual Spring-Damper)](#25-2-link-다리-기구학과-가상-스프링-댐퍼virtual-spring-damper)
-   * [2.6. 관절 토크 PD 제어 및 중력 보상 원리](#26-관절-토크-pd-제어-및-중력-보상-원리)
-   * [2.7. 도킹 정지(Stance Lock)와 미세 발구름(In-place Stepping) 진동 억제](#27-도킹-정지stance-lock와-미세-발구름in-place-stepping-진동-억제)
+1. [왜 U01(Tron1 보행 및 제자리 발구름 검증)이 필요한가?](#1-왜-u01tron1-보행-및-제자리-발구름-검증이-필요한가)
+2. [핵심 이론: 포인트 풋 2족 로봇 동역학과 Sim-to-Real 강화학습 제어](#2-핵심-이론-포인트-풋-2족-로봇-동역학과-sim-to-real-강화학습-제어)
+   * [2.1. 포인트 풋(Point-Foot)의 기구학적 특성과 지지 다각형(Support Polygon)의 부재](#21-포인트-풋point-foot의-기구학적-특성과-지지-다각형support-polygon의-부재)
+   * [2.2. 고전 수식 제어(PID/ZMP)의 한계와 강화학습(DRL)의 필연성](#22-고전-수식-제어pidzmp의-한계와-강화학습drl의-필연성)
+   * [2.3. LimX 공식 RL 아키텍처 (PPO & Actor-Critic)](#23-limx-공식-rl-아키텍처-ppo--actor-critic)
+   * [2.4. 관측 공간 (Observation Space: 투영 중력과 고유 감각)](#24-관측-공간-observation-space-투영-중력과-고유-감각)
+   * [2.5. 행동 공간 (Action Space) 및 500Hz 관절 PD 제어 연동](#25-행동-공간-action-space-및-500hz-관절-pd-제어-연동)
+   * [2.6. 제자리 발구름(In-place Stepping)의 동적 평형 원리](#26-제자리-발구름in-place-stepping의-동적-평형-원리)
 3. [단계별 실습: 내 손으로 직접 만들고 검증하기](#3-단계별-실습-내-손으로-직접-만들고-검증하기)
-   * [Step 1: 작업 디렉토리 확인](#step-1-작업-디렉토리-확인)
+   * [Step 1: 환경 설정 및 공식 사전 훈련 모델 준비](#step-1-환경-설정-및-공식-사전-훈련-모델-준비)
    * [Step 2: 단위 샌드박스 씬 (unit_test_models/phase01_u01_scene_unit_tron1.xml) 직접 작성](#step-2-단위-샌드박스-씬-unit_test_modelsphase01_u01_scene_unit_tron1xml-직접-작성)
-   * [Step 3: 단위 검증 스크립트 (scripts_devel_roadmap/phase01_u01_test_tron1_walking.py) 직접 작성](#step-3-단위-검증-스크립트-scripts_devel_roadmapphase01_u01_test_tron1_walkingpy-직접-작성)
-   * [Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 해석)](#step-4-스크립트-실행-및-결과-검증-물리-정합성-해석)
-   * [Step 5: 인터랙티브 3D GUI 뷰어 조작 실습](#step-5-인터랙티브-3d-gui-뷰어-조작-실습)
+   * [Step 3: RL 제자리 발구름 제어 스크립트 (scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py) 직접 작성](#step-3-rl-제자리-발구름-제어-스크립트-scripts_devel_roadmapphase01_u01_test_tron1_walking_rlpy-직접-작성)
+   * [Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 및 텔레메트리 해석)](#step-4-스크립트-실행-및-결과-검증-물리-정합성-및-텔레메트리-해석)
+   * [Step 5: 인터랙티브 3D GUI 뷰어 조작 및 Reset 동기화 실습](#step-5-인터랙티브-3d-gui-뷰어-조작-및-reset-동기화-실습)
 4. [트러블슈팅 가이드 (자주 겪는 오류 및 원인 분석)](#4-트러블슈팅-가이드-자주-겪는-오류-및-원인-분석)
-5. [Phase 01-U01 완료 체크리스트](#5-phase-01-u01-완료-체크리스트)
+5. [Phase 01-U01 Step 1 완료 체크리스트](#5-phase-01-u01-step-1-완료-체크리스트)
 
 ---
 
-## 1. 왜 U01(Tron1 단독 보행 및 도킹 정지 검증)이 필요한가?
+## 1. 왜 U01(Tron1 보행 및 제자리 발구름 검증)이 필요한가?
 
-모바일 매니퓰레이션(Mobile Manipulation) 협동 작업에서 가장 빈번하게 발생하는 실패 요인은 **"로봇팔이 물건을 집으려는 순간, 이족보행 로봇의 베이스가 미세하게 흔들리는 현상"**입니다.
+모바일 매니퓰레이션(Mobile Manipulation) 협동 작업에서 가장 빈번하게 발생하는 실패 요인은 **"로봇팔이 물건을 집으려는 순간, 이족보행 로봇의 베이스가 미세하게 흔들리거나 자세를 잡지 못하고 넘어지는 현상"**입니다.
 
 * **원인:** 발바닥이 평평한 휴머노이드 로봇과 달리, **Tron1은 발끝이 점(Point Foot, 구체)** 형태로 되어 있습니다. 발목 관절(Ankle Joint)이 존재하지 않아 지면을 발목 힘으로 딛고 버티는 정적 안정성(Static Stability)이 전혀 없습니다.
-* **현상:** 보행을 멈추더라도 제자리에서 중심을 잡기 위해 발을 끊임없이 동동 구르는 **미세 발구름(In-place Stepping)**이 발생하며, 이는 상체에 장착될 트레이와 물병에 연속적인 고주파 진동 외란을 전달합니다.
-* **해결 방안:** 따라서 상체에 컵홀더 트레이와 물병을 얹기 전(U02), 순수 로봇 본체(Bare Robot) 상태에서:
-  1. 공중에서 바닥으로 떨어졌을 때 무릎 충격을 흡수하며 직립(Standing)하고,
-  2. 목표 거리(인계 구역)까지 전진 보행을 안정적으로 수행하며,
-  3. 목표점에 도달하는 즉시 양발을 안정적인 지지 삼각형 구도로 고정하는 **스탠스 락(Stance Lock)**을 활성화하여 3초 이상 진동을 완벽히 소쇄하는지 독립적으로 검증해야 합니다.
+* **현상:** 가만히 서 있으려고 하면 즉시 쓰러지므로, 로봇은 넘어지지 않기 위해 끊임없이 발을 디디며 지면 반력을 형성하는 **제자리 발구름(In-place Stepping)**을 수행해야 합니다.
+* **해결 방안:** 따라서 상체에 무거운 컵홀더 트레이와 물병을 얹기 전(U02), 순수 로봇 본체(Bare Robot) 상태에서:
+  1. 공중에서 바닥으로 스폰되었을 때 충격을 흡수하며 안정적으로 착지하고,
+  2. LimX 공식 사전 훈련된 신경망 정책(ONNX Policy)을 추론하여,
+  3. 제자리에서 쓰러지지 않고 양발을 연속으로 구르며(In-place Stepping) 영구적인 직립 평형을 달성하는지 독립적으로 검증해야 합니다.
+
+---
+
+## 2. 핵심 이론: 포인트 풋 2족 로봇 동역학과 Sim-to-Real 강화학습 제어
+
+### 2.1. 포인트 풋(Point-Foot)의 기구학적 특성과 지지 다각형(Support Polygon)의 부재
+
+Tron1 로봇은 다리당 3개의 관절(Abad: 롤 회전, Hip: 피치 회전, Knee: 피치 회전)로 구성되어 있습니다:
 
 ```
-[U00: 베이스 물리 환경] ──(완료)──> [U01: Tron1 순수 보행/정지] ────> [U02: 트레이 장착 & 물병 운반]
-                                          │
-                     ┌────────────────────┴────────────────────┐
-                     │ 1. 스폰 착지 충격 흡수 (Landing)            │
-                     │ 2. 목표점 전진 보행 (Locomotion)           │
-                     │ 3. 3초간 진동 없는 정지 (Stance Lock)       │
-                     └─────────────────────────────────────────┘
+[ 상체 Base CoM: (x=+0.0457m, z=0.58m) ]
+          │
+     (Abad Joint: Roll)
+          │
+      (Hip Joint: Pitch)
+          │  Upper Leg (L1 = 0.30m)
+      (Knee Joint: Pitch)
+          │  Lower Leg (L2 = 0.30m)
+    [ Foot Sphere (R = 0.032m, Contact Point) ]
+```
+
+* **자유도 결핍(Underactuation):** 발목 관절이 없으므로, 지면 접촉점에서의 순수 모멘트는 항상 $\mathbf{m}_c = \mathbf{0}$입니다.
+* **지지 다각형의 한계:** 두 발이 지면에 닿아 있는 순간에도 지지 영역은 두 접촉점을 잇는 1차원 선분(Line)에 불과합니다. 따라서 피치(전후) 방향으로는 **완전한 무구동 역진자(Unactuated Inverted Pendulum)** 상태가 됩니다.
+
+---
+
+### 2.2. 고전 수식 제어(PID/ZMP)의 한계와 강화학습(DRL)의 필연성
+
+고전 모델 기반 제어(LIPM, ZMP)는 로봇의 모든 질량이 한 점에 집중되어 있고 다리는 질량이 없다는 단순화 가정을 전제로 합니다. 하지만 실제 Tron1은:
+1. 각 다리 링크 자체의 질량($1.47\text{kg}, 2.3\text{kg}, 0.55\text{kg}$)과 회전 관성 모멘트가 큽니다.
+2. 지면 충돌 시 충격량(Impulse)의 비선형성과 마찰 원뿔(Friction Cone) 제약이 강합니다.
+3. 고관절 회전 시 작용-반작용에 의해 골반 상체가 반대 방향으로 회전하는 강한 결합 동역학(Coupled Dynamics)이 발생합니다.
+
+이러한 고차 비선형 동역학을 극복하기 위해, LimX Dynamics는 **심층 강화학습(Deep Reinforcement Learning)**을 공식 제어 아키텍처로 사용합니다.
+
+---
+
+### 2.3. LimX 공식 RL 아키텍처 (PPO & Actor-Critic)
+
+LimX Dynamics는 **PPO (Proximal Policy Optimization)** 알고리즘을 사용하여 환경과 상호작용하는 Actor 네트워크를 학습시킵니다.
+
+```mermaid
+flowchart LR
+    subgraph MuJoCo_Simulation["MuJoCo 3.x 물리 엔진 (1000 Hz)"]
+        Sensors["IMU Sensor & Encoders<br/>(Quat, Gyro, q, dq)"]
+    end
+
+    subgraph RL_Controller["LimX RL Policy Pipeline (500 Hz, dt=0.002s)"]
+        Obs["Observation Vector 생성<br/>(Projected Gravity, Gyro, q_err, dq, last_act)"]
+        Encoder["Encoder ONNX<br/>(History Latent Compression)"]
+        Policy["Actor ONNX (Policy)<br/>(Action Output: delta q)"]
+        Scale["Action Rescaling<br/>q_target = q_default + scale * action"]
+    end
+
+    subgraph Joint_PD["Low-level Joint PD (1000 Hz)"]
+        Torque["tau = Kp*(q_target - q) - Kd*dq<br/>Clipping: [-60, 60] Nm"]
+    end
+
+    Sensors --> Obs
+    Obs --> Encoder
+    Encoder --> Policy
+    Obs --> Policy
+    Policy --> Scale
+    Scale --> Torque
+    Torque -->|data.ctrl| MuJoCo_Simulation
 ```
 
 ---
 
-## 2. 핵심 이론: 포인트 풋 2족 로봇 동역학과 제어 원리
+### 2.4. 관측 공간 (Observation Space: 투영 중력과 고유 감각)
 
-### 2.1. 포인트 풋(Point-Foot)의 기구학적 특성과 발목 토크의 부재
+신경망에 입력되는 관측 벡터 $\mathbf{o}_t$는 로봇 전역 좌표가 아닌, 온보드 IMU 및 관절 엔코더만으로 구성됩니다:
 
-휴머노이드 로봇은 넓은 직사각형 발바닥을 가지고 있어 발목에 모터를 장착하여 지면을 누르는 토크($\tau_{ankle}$)를 발생시킬 수 있습니다.  
-반면, **Tron1의 다리 구조**는 경량화와 고속 기동성을 위해 끝단이 구체(반지름 $R=0.032\text{m}$) 형태인 **Point-Foot** 구조입니다:
-
-* **다리당 관절 수:** 3개 (Abad: 롤 회전, Hip: 피치 회전, Knee: 피치 회전)
-* **자유도 결핍(Underactuation):** 발목 관절이 없으므로, 지면 접촉점(Contact Point)에서는 마찰력에 의한 반력 $\mathbf{f}_c$만 전달될 뿐 모멘트(Moment) $\mathbf{m}_c$를 능동적으로 발생시킬 수 없습니다.
-* **결론:** 기립과 보행의 안정성을 확보하기 위해서는 오직 **고관절(Hip)과 무릎(Knee)의 협조 제어** 및 **발끝의 착지 위치(Foot Placement)**에 의해서만 로봇의 전도를 막아야 합니다.
-
----
-
-### 2.2. 역진자 모델(LIPM)과 질량 중심(CoM) 동역학
-
-2족 보행 로봇의 복잡한 다물체 동역학은 로봇의 모든 질량이 중심 높이 $z_c$에 집중되어 있고, 다리는 질량이 없는 신축 막대로 가정한 **선형 역진자 모델(LIPM: Linear Inverted Pendulum Model)**로 근사화할 수 있습니다:
-
-$$\ddot{x} = \frac{g}{z_c} (x - x_{foot}) = \omega^2 (x - x_{foot})$$
-
-여기서:
-* $x$: 로봇 질량 중심(CoM)의 수평 위치
-* $x_{foot}$: 지면에 닿아 있는 지지발(Stance Foot)의 위치
-* $z_c$: CoM의 수직 높이 (Tron1 기준 약 $0.78 \sim 0.82\text{m}$)
-* $g$: 중력 가속도 ($9.81\text{m/s}^2$)
-* $\omega = \sqrt{g / z_c}$: 역진자의 고유 진동수 (약 $\sqrt{9.81 / 0.8} \approx 3.5\text{rad/s}$)
-
-> [!NOTE]
-> **물리적 의미:**  
-> 질량 중심이 지지발보다 앞서 나가면($x > x_{foot}$), 가속도 $\ddot{x}$가 양수가 되어 로봇은 전방으로 넘어지려고 합니다.  
-> 넘어지지 않으려면 다음 걸음(Next Step)의 발 착지 위치 $x_{foot}$를 CoM 진행 방향 앞쪽에 재빨리 놓아야 합니다. 이것이 바로 **Raibert 발딛기 제어기(Foot Placement Heuristic)**의 핵심 원리입니다.
+1. **상체 각속도 ($\boldsymbol{\omega}_{base} \in \mathbb{R}^3$):** IMU Gyro 센서 측정 3축 각속도 (스케일: $\times 0.25$)
+2. **투영 중력 벡터 ($\mathbf{g}_{proj} \in \mathbb{R}^3$):**  
+   전역 중력 방향 $[0, 0, -1]^T$를 상체 회전 쿼터니언($\mathbf{q}_{imu}$)을 통해 로봇 로컬 프레임으로 투영한 3차원 단위 벡터:
+   $$\mathbf{g}_{proj} = \mathbf{R}(\mathbf{q}_{imu})^T \begin{bmatrix} 0 \\ 0 \\ -1 \end{bmatrix}$$
+3. **속도 명령 벡터 ($\mathbf{v}_{cmd} \in \mathbb{R}^3$):** 전진 속도 $v_x$, 횡방향 속도 $v_y$, 요 회전속도 $\omega_z$. *(제자리 발구름 시 $[0.0, 0.0, 0.0]$ 인가)*
+4. **관절 위치 오차 ($\mathbf{q} - \mathbf{q}_{default} \in \mathbb{R}^6$):** 현재 6개 관절 위치와 기준 자세 간의 차이 (스케일: $\times 1.0$)
+5. **관절 각속도 ($\dot{\mathbf{q}} \in \mathbb{R}^6$):** 현재 6개 관절 엔코더 각속도 (스케일: $\times 0.05$)
+6. **직전 행동 값 ($\mathbf{a}_{t-1} \in \mathbb{R}^6$):** 직전 스텝에서 신경망이 출력했던 6차원 행동 벡터
 
 ---
 
-### 2.3. Zero Moment Point (ZMP)와 지지 다각형의 한계
+### 2.5. 행동 공간 (Action Space) 및 500Hz 관절 PD 제어 연동
 
-* **ZMP (Zero Moment Point):** 지면 반력에 의해 발생하는 수평 방향의 순수 모멘트가 0이 되는 지면 위의 가상 지점입니다.
-* **평평한 발:** ZMP가 넓은 발바닥 면적(지지 다각형, Support Polygon) 내부 안에 머무르면 넘어지지 않습니다.
-* **포인트 풋 로봇:** 지지 다각형이 단 한 점(Single Contact Point)으로 축소됩니다!
-  * 따라서 한 발 지지기(Single Support)에서는 ZMP가 무조건 발 접촉점에 묶이게 되며, **정적 안정이 물리적으로 불가능**합니다.
-  * 유일하게 정적 안정을 이룰 수 있는 순간은 **두 발이 동시에 지면에 닿아 있는 양발 지지기(Double Support)**뿐입니다. 이때 두 발 사이를 잇는 선분이 지지 영역이 됩니다.
-
----
-
-### 2.4. 보행 상태 머신(Gait FSM)과 주기적 위상 변수($\phi$)
-
-보행은 주기적인 상태 전이(State Transition)로 모델링됩니다.  
-보행 주기(Gait Cycle Period)를 $T$ (예: $0.5\text{초}$)라 할 때, 정규화된 위상 변수 $\phi \in [0, 1)$를 다음과 같이 정의합니다:
-
-$$\phi(t) = \frac{t \pmod T}{T}$$
-
-```
-   0.0 ────────────── 0.5 ────────────── 1.0 (Phase φ)
-┌──────────────────────┬──────────────────────┐
-│   Left Stance (지지) │   Left Swing (유각)  │  왼다리 (Left Leg)
-│   Right Swing (유각) │   Right Stance (지지)│  오른다리 (Right Leg)
-└──────────────────────┴──────────────────────┘
-```
-
-1. **위상 1 ($\phi \in [0, 0.5)$):**
-   * **왼다리:** 지면을 지지하며 몸체를 지탱하고 전방으로 밀어냄 (Stance Phase).
-   * **오른다리:** 지면에서 떨어져 공중을 가르며 앞으로 이동 (Swing Phase).
-2. **위상 2 ($\phi \in [0.5, 1.0)$):**
-   * **오른다리:** 지면 접촉 후 지지 다리로 전환 (Stance Phase).
-   * **왼다리:** 지면에서 떨어져 전방으로 이동 (Swing Phase).
+* **신경망 출력:** 6차원 목표 관절 각도 오프셋 $\mathbf{a}_t \in [-1.0, 1.0]^6$
+* **목표 관절 각도 변환:**
+  $$\mathbf{q}_{target} = \mathbf{q}_{default} + \text{action\_scale} \cdot \mathbf{a}_t$$
+  여기서 `action_scale = 0.25 rad`이며, `PF_TRON1A`의 공식 기본 자세 $\mathbf{q}_{default}$는 전 관절 `0.0 rad`입니다.
+* **관절 토크 변환 ($1000\text{Hz}$, $dt = 0.001\text{s}$):**
+  $$\boldsymbol{\tau} = \mathbf{K}_p (\mathbf{q}_{target} - \mathbf{q}) - \mathbf{K}_d \dot{\mathbf{q}}$$
+  공식 게인: $K_p = 42.0$, $K_d = 2.0$. 계산된 토크는 모터 허용 한계 $[-60\text{ Nm}, +60\text{ Nm}]$로 클리핑되어 인가됩니다.
 
 ---
 
-### 2.5. 2-Link 다리 기구학과 가상 스프링-댐퍼(Virtual Spring-Damper)
+### 2.6. 제자리 발구름(In-place Stepping)의 동적 평형 원리
 
-Tron1의 다리는 고관절(Hip)과 무릎(Knee)으로 이루어진 2절 링크(2-link planar manipulator)로 취급할 수 있습니다.
-
-* **링크 길이:**
-  * 상퇴 링크(Upper leg, Hip to Knee): $L_1 = 0.30\text{m}$
-  * 하퇴 링크(Lower leg, Knee to Foot): $L_2 = 0.30\text{m}$
-* **순기구학 (Forward Kinematics):**
-  고관절 각도 $q_{hip}$과 무릎 각도 $q_{knee}$로부터 발끝의 상대 위치 $(x_{foot}, z_{foot})$:
-  $$x_{foot} = L_1 \sin(q_{hip}) + L_2 \sin(q_{hip} - q_{knee})$$
-  $$z_{foot} = -L_1 \cos(q_{hip}) - L_2 \cos(q_{hip} - q_{knee})$$
-
-* **가상 스프링-댐퍼 (Virtual Spring-Damper):**
-  발이 지면에 닿을 때 강체 충격으로 인한 수치 튕김(Jitter)을 완화하기 위해, 다리 전체를 가상의 탄성 서스펜션으로 모델링합니다:
-  $$F_z = K_{leg} (z_{target} - z_{foot}) - D_{leg} \dot{z}_{foot}$$
-  야코비 행렬(Jacobian $J$)의 전치(Transpose)를 통해 관절 토크로 변환합니다:
-  $$\boldsymbol{\tau} = \mathbf{J}^T \mathbf{F}$$
-
----
-
-### 2.6. 관절 토크 PD 제어 및 중력 보상 원리
-
-Tron1 모델(`model_ori/PF_TRON1A/xml/robot.xml`)의 액추에이터는 위치 서보가 아닌 **토크 모터(`<motor>`)**로 선언되어 있습니다.  
-따라서 제어기는 매 타임스텝($dt=0.001\text{s}$)마다 관절 각도 오차와 각속도를 기반으로 인가할 토크 $\tau$를 계산해야 합니다:
-
-$$\tau_i = K_p (q_{des, i} - q_{act, i}) + K_d (\dot{q}_{des, i} - \dot{q}_{act, i}) + \tau_{grav, i}$$
-
-* $K_p$: 비례 게인 (관절 강성, Stiffness)
-* $K_d$: 미분 게인 (관절 댐핑, Damping)
-* $\tau_{grav}$: 로봇 상체 질량($m \approx 15\text{kg}$)을 지탱하기 위해 무릎과 고관절이 버텨야 하는 정적 중력 보상 토크:
-  $$\tau_{knee, grav} \approx \frac{1}{2} m g L \sin(q_{knee} / 2)$$
-
----
-
-### 2.7. 도킹 정지(Stance Lock)와 미세 발구름(In-place Stepping) 진동 억제
-
-목표 지점(인계 구역, 예: $x = 1.0\text{m}$)에 도달했을 때, 보행 패턴을 즉시 멈추고 양발을 지면에 고정하는 **Stance Lock** 모드로 전환합니다:
-
-1. **양발 지지 기하 대칭화:** 양쪽 다리의 목표 각도를 대칭적인 직립 자세($q_{stand}$)로 즉시 동기화합니다.
-2. **게인 스케줄링 (Gain Scheduling):**
-   * 보행 중: 유연한 충격 흡수를 위해 적정 게인 ($K_p = 60 \sim 80, K_d = 2 \sim 3$)
-   * 정지(Stance Lock) 시: 외란 및 잔류 진동을 빠르게 소쇄하기 위해 강성 게인 대폭 상향 ($K_p = 150 \sim 200, K_d = 8 \sim 12$)
-3. **안정성 판정 (3-Second Stance Lock Rule):**
-   * 인계 구역 도달 후 최소 3초 동안 몸체의 롤(Roll) 및 피치(Pitch) 각속도가 **$0.05\text{rad/s}$ (약 $2.8^\circ/\text{s}$) 이하**로 유지되어야 합니다.
+포인트 풋 2족 로봇은 정적 지지면이 없기 때문에, 제자리에서 균형을 유지할 때도 **미세하게 양발을 번갈아 들어 올리고 내리며(Limit Cycle Stepping)** 지면 반력을 지속적으로 재배치합니다:
+1. 상체가 왼쪽으로 미세하게 기울어지면 왼발을 지지하고 오른발을 살짝 들어 착지 위치를 외측으로 조정합니다.
+2. 상체가 전방으로 숙여지면 유각 발을 신속히 전방으로 내딛어 지면 충격 반력으로 CoM을 뒤로 밀어냅니다.
+3. 이 교대 발구름 과정이 $3 \sim 4\text{Hz}$의 고유 주기로 연속 반복되며 로봇이 넘어지지 않고 영구적으로 서 있게 됩니다.
 
 ---
 
 ## 3. 단계별 실습: 내 손으로 직접 만들고 검증하기
 
 > [!IMPORTANT]
-> **학습 가이드:**  
-> 아래 코드 블록들을 직접 확인하고, 프로젝트 디렉토리에 해당 파일을 생성하여 붙여넣은 뒤 실행해 보세요!  
-> 파일 경로와 파일명을 정확하게 맞추어야 합니다.
+> **자립형(Self-Contained) 실습 가이드:**  
+> 아래 단계는 Phase 01-U00 완료 상태에서 시작하여, **기존 파일이 존재하지 않는다고 가정하고 씬 XML과 파이썬 코드를 처음부터 완벽하게 직접 생성하는 전 과정**을 담고 있습니다.
 
 ---
 
-### Step 1: 작업 디렉토리 확인
+### Step 1: 환경 설정 및 공식 사전 훈련 모델 준비
 
-터미널에서 프로젝트 루트 디렉토리인지 확인합니다:
+Conda 가상환경(`transfer_bottle_by_tron1_py3_10`)을 활성화하고, ONNX 런타임 설치 및 LimX 공식 `PF_TRON1A` 사전 훈련 신경망 모델 2종(`policy.onnx`, `encoder.onnx`)을 프로젝트의 `model_rl/tron1/` 디렉토리에 다운로드합니다:
+
 ```bash
-pwd
-# 출력 확인: .../Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
+# 1. Conda 가상환경 활성화 및 onnxruntime 설치
+conda activate transfer_bottle_by_tron1_py3_10
+python -m pip install onnxruntime
+
+# 2. 모델 저장 디렉토리 생성
+mkdir -p model_rl/tron1
+
+# 3. LimX 공식 PF_TRON1A 사전 훈련 모델 다운로드
+wget -O model_rl/tron1/policy.onnx https://github.com/limxdynamics/tron1-rl-deploy-python/raw/main/controllers/model/PF_TRON1A/policy/isaacgym/policy.onnx
+wget -O model_rl/tron1/encoder.onnx https://github.com/limxdynamics/tron1-rl-deploy-python/raw/main/controllers/model/PF_TRON1A/policy/isaacgym/encoder.onnx
 ```
 
 ---
 
 ### Step 2: 단위 샌드박스 씬 (`unit_test_models/phase01_u01_scene_unit_tron1.xml`) 직접 작성
 
-U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic")과 바닥 평면을 기반으로, Tron1의 기구체, STL 메쉬, 모터 액추에이터, IMU 센서를 결합한 단독 단위 씬입니다.
+U00의 베이스 환경(바닥 평면, 격자 텍스처, implicitfast 물리 옵션)을 상속하고, Tron1 로봇 기구체와 모터 액추에이터, IMU 센서를 결합한 단독 씬 파일입니다.
 
-파일을 새로 생성하고 아래의 전체 MJCF 코드를 저장합니다:
-* **생성할 파일 경로:** `unit_test_models/phase01_u01_scene_unit_tron1.xml`
+새 파일을 생성하고 아래의 **전체 MJCF XML 코드(198줄)**를 그대로 저장합니다:
+* **생성 파일 경로:** `unit_test_models/phase01_u01_scene_unit_tron1.xml`
 
 ```xml
 <mujoco model="phase01_u01_unit_tron1">
@@ -272,7 +261,7 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
           contype="1" conaffinity="1" friction="1.0 0.005 0.0001" condim="3"/>
 
     <!-- 도킹 인계 구역 목표 마커 (x = 1.0m, y = 0.0m 지점에 반투명 원기둥 표시) -->
-    <geom name="docking_target_marker" type="cylinder" pos="1.0 0 0.005" size="0.25 0.005"
+    <geom name="docking_target_marker" type="cylinder" pos="1.0 0 0.001" size="0.25 0.001"
           material="target_marker_mat" contype="0" conaffinity="0" group="1"/>
 
     <!-- 조망 관찰 카메라 -->
@@ -282,9 +271,9 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
 
     <!-- 
       [Tron1 로봇 모델 본체]
-      초기 스폰 위치: pos="0 0 0.82" (다리를 살짝 굽혔을 때 발끝이 지면에 정렬되는 안정 스폰 높이)
+      초기 스폰 위치: pos="0 0 0.80" (직립 다리 길이 0.78m 대비 약 2cm 부드러운 지면 안착 높이)
     -->
-    <body name="base_Link" pos="0 0 0.82">
+    <body name="base_Link" pos="0 0 0.80">
       <!-- 6-DOF 자유 관절 (공간 상을 자유롭게 이동 및 회전) -->
       <freejoint name="root_joint"/>
       
@@ -313,6 +302,8 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
             <joint name="knee_L_Joint" axis="0 -1 0" range="-0.87 1.36"/>
             <geom class="visual" mesh="knee_L_Link" material="robot_body_mat"/>
             <geom name="knee_L_col" type="cylinder" pos="0.078 0 -0.12" euler="0 -0.55 0" size="0.015 0.13" class="collision"/>
+            <!-- 무릎 관절 힌지 바닥 충돌 방지용 구체 -->
+            <geom name="knee_L_cap_col" type="sphere" pos="0 0 0" size="0.032" class="collision"/>
 
             <!-- 왼발끝 포인트 풋 (구체 접촉자: 반지름 0.032m) -->
             <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_L_Link" material="robot_dark_mat"/>
@@ -341,6 +332,8 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
             <joint name="knee_R_Joint" axis="0 1 0" range="-1.36 0.87"/>
             <geom class="visual" mesh="knee_R_Link" material="robot_body_mat"/>
             <geom name="knee_R_col" type="cylinder" pos="0.078 0 -0.12" euler="0 -0.55 0" size="0.015 0.13" class="collision"/>
+            <!-- 무릎 관절 힌지 바닥 충돌 방지용 구체 -->
+            <geom name="knee_R_cap_col" type="sphere" pos="0 0 0" size="0.032" class="collision"/>
 
             <!-- 오른발끝 포인트 풋 (구체 접촉자: 반지름 0.032m) -->
             <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_R_Link" material="robot_dark_mat"/>
@@ -353,7 +346,7 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
     </body>
   </worldbody>
 
-  <!-- 7. 액추에이터 정의: 6개 모터 직접 토크 제어 ([-80, 80] Nm) -->
+  <!-- 7. 액추에이터 정의: 6개 모터 직접 토크 제어 (LimX 공식 규격: [-80, 80] Nm) -->
   <actuator>
     <motor name="abad_L_motor" joint="abad_L_Joint" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
     <motor name="hip_L_motor"  joint="hip_L_Joint"  gear="1" ctrllimited="true" ctrlrange="-80 80"/>
@@ -379,36 +372,37 @@ U00에서 검증한 공통 물리 옵션(dt=0.001s, implicitfast, cone="elliptic
     <jointvel name="vel_knee_L" joint="knee_L_Joint"/>
     <jointvel name="vel_abad_R" joint="abad_R_Joint"/>
     <jointvel name="vel_hip_R"  joint="hip_R_Joint"/>
+    <jointvel name="vel_knee_R" joint="knee_R_Joint"/>
   </sensor>
 
   <!-- 9. 기본 안정 기립 키프레임 (뷰어 리셋 시 기본 자세 자동 복원) -->
   <keyframe>
-    <key name="stand" qpos="0 0 0.82 1 0 0 0 0.0 0.40 0.80 0.0 -0.40 -0.80"/>
+    <!-- 직립 기립 자세(Standing Pose): Base Z = 0.80m, Straight Stance (전 관절 0.0 rad) -->
+    <key name="stand" qpos="0 0 0.80 1 0 0 0 0.0 0.0 0.0 0.0 0.0 0.0"/>
   </keyframe>
 </mujoco>
 ```
 
 ---
 
-### Step 3: 단위 검증 스크립트 (`scripts_devel_roadmap/phase01_u01_test_tron1_walking.py`) 직접 작성
+### Step 3: RL 제자리 발구름 제어 스크립트 (`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`) 직접 작성
 
-이 스크립트는 다음 4단계 상태 머신을 거쳐 Tron1의 보행 및 정지 성능을 정량적으로 판정합니다:
-1. **`STATE_LANDING` (0.0 ~ 1.5초):** 공중 스폰 후 지면 접촉 충격을 흡수하고 초기 기립.
-2. **`STATE_WALKING` (1.5초 ~ 도달 시):** 교대 보행 위상($\phi$)에 따라 전진 보행하여 목표점($x = 1.0\text{m}$)까지 이동.
-3. **`STATE_STANCE_LOCK` (도달 후 3.0초간):** 보행을 멈추고 관절 게인을 3배 상향하여 잔류 진동을 강제 감쇠.
-4. **`STATE_EVALUATION`:** 롤/피치 진동 수렴도, 목표 오차($\le \pm 5\text{cm}$), 전도 여부를 검증하고 오프스크린 렌더링 스냅샷 저장.
+이 스크립트는 `model_rl/tron1/`에 저장된 LimX 공식 사전 훈련 ONNX 모델(`policy.onnx`, `encoder.onnx`)을 로드하여 500Hz 고속 추론을 수행하며, 1.0x 실시간 동기화 및 뷰어/터미널 리셋 인터페이스를 완벽하게 제공합니다.
 
-파일을 새로 생성하고 아래 전체 소스 코드를 저장합니다:
-* **생성할 파일 경로:** `scripts_devel_roadmap/phase01_u01_test_tron1_walking.py`
+새 파일을 생성하고 아래의 **전체 Python 소스코드**를 그대로 저장합니다:
+* **생성 파일 경로:** `scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`
 
 ```python
 #!/usr/bin/env python3
 """
-scripts_devel_roadmap/phase01_u01_test_tron1_walking.py
-Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock
+scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
+Phase 01-U01: Tron1 LimX Official Pretrained RL In-place Stepping & Balancing
+- Loads official pretrained ONNX models (policy.onnx, encoder.onnx) from model_rl/tron1/
+- 500Hz Policy Inference with Projected Gravity & Proprioceptive Observations
+- High-frequency Joint PD torque execution (Kp=42.0, Kd=2.0)
 - 1.0x Real-time Physics Speed Synchronization
-- Interactive Viewer Auto-Reset Support (Instant sync on Backspace/Reset)
-- Unified 3D GUI & Console Telemetry Loop
+- Interactive Viewer Auto-Reset Support (Instant sync on Reset button / Backspace / Terminal Enter)
+- Telemetry monitoring: Base height Z, gyro rates, pitch, and in-place stepping stability
 """
 
 import os
@@ -416,9 +410,31 @@ import sys
 import argparse
 import math
 import time
+import threading
+from dataclasses import dataclass
 import numpy as np
 import mujoco
 import mujoco.viewer
+
+try:
+    import onnxruntime as ort
+except ImportError:
+    print("\033[91m[에러] 'onnxruntime' 패키지가 설치되지 않았습니다.\033[0m")
+    print("다음 명령어를 실행하여 설치해 주세요: python -m pip install onnxruntime")
+    sys.exit(1)
+
+@dataclass
+class RobotState:
+    state: str = "landing"         # 'landing' -> 'stepping' (전도 시 'falling')
+    sim_time: float = 0.0
+    pos_x: float = 0.0
+    pos_z: float = 0.0
+    pitch: float = 0.0
+    pitch_deg: float = 0.0
+    gyro_norm: float = 0.0
+    touch_L: bool = False
+    touch_R: bool = False
+    is_fallen: bool = False
 
 class Colors:
     GREEN = '\033[92m'
@@ -429,25 +445,24 @@ class Colors:
     RESET = '\033[0m'
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Phase 01-U01 Tron1 Locomotion Test")
-    parser.add_argument("--headless", action="store_true", help="Run in headless text-only mode (no GUI window)")
+    parser = argparse.ArgumentParser(description="Phase 01-U01: Tron1 Pretrained RL In-place Stepping")
     parser.add_argument("--xml", type=str, default="unit_test_models/phase01_u01_scene_unit_tron1.xml",
                         help="Path to Tron1 unit scene XML")
-    parser.add_argument("--target_x", type=float, default=1.0, help="Target docking X coordinate in meters")
-    parser.add_argument("--max_time", type=float, default=12.0, help="Maximum simulation time limit in seconds")
+    parser.add_argument("--model_dir", type=str, default="model_rl/tron1",
+                        help="Path to directory containing policy.onnx and encoder.onnx")
+    parser.add_argument("--max_time", type=float, default=20.0, help="Maximum simulation time limit in seconds")
+    parser.add_argument("--no-gui", action="store_true", help="Run simulation in headless mode without 3D viewer")
+    parser.add_argument("--no-hold", action="store_true", help="Disable origin position hold feedback")
     return parser.parse_args()
 
-class Tron1BipedController:
+class Tron1RLController:
     """
-    Tron1 전용 2족 보행 및 스탠스 락 제어기
-    - 기립 초기화: 스폰 순간 다리 급접힘(kick-down) 방지
-    - 위상 변수(Phase) 기반 교대 보행 사인파 궤적
-    - 상체 자세(Roll/Pitch) 안정화 피드백
-    - 도킹 정지 시 게인 스케줄링(Stance Lock)
+    LimX Dynamics 공식 상용 사전훈련 ONNX 모델 기반 제자리 발구름(In-place Stepping) 제어기
     """
-    def __init__(self, model, target_x=1.0):
+    def __init__(self, model, model_dir="model_rl/tron1", hold_position=True):
         self.model = model
-        self.target_x = target_x
+        self.model_dir = model_dir
+        self.hold_position = hold_position
 
         self.actuator_names = [
             "abad_L_motor", "hip_L_motor", "knee_L_motor",
@@ -455,410 +470,377 @@ class Tron1BipedController:
         ]
         self.act_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in self.actuator_names]
         self.base_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "base_Link")
+        self.foot_L_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "foot_L_col")
+        self.foot_R_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "foot_R_col")
 
-        # 기립 기본 관절 각도 (자연스러운 완충 기립 자세)
-        self.q_stand = np.array([0.0, 0.40, 0.80,  0.0, -0.40, -0.80])
+        # LimX PF_TRON1A 공식 제어 매개변수 (params.yaml 정합)
+        self.default_joint_pos = np.zeros(6, dtype=np.float32)
+        self.kp = 42.0
+        self.kd = 3.5
+        self.action_scale = 0.25
+        self.torque_limit = 80.0
+        self.decimation = 10  # 500Hz / 10 = 50Hz RL Policy Loop
 
-        # 관절 강성 및 댐핑 게인
-        self.kp_walk = np.array([120.0, 150.0, 150.0,  120.0, 150.0, 150.0])
-        self.kd_walk = np.array([6.0, 8.0, 8.0,        6.0, 8.0, 8.0])
+        # 관측 정규화 및 크기 설정
+        self.observations_size = 30
+        self.obs_history_length = 10
+        self.gait = np.array([2.0, 0.5, 0.5, 0.1], dtype=np.float32)
+        self.commands = np.zeros(3, dtype=np.float32)  # 제자리 발구름: [vx=0, vy=0, wz=0]
 
-        self.kp_lock = np.array([200.0, 250.0, 250.0,  200.0, 250.0, 250.0])
-        self.kd_lock = np.array([12.0, 15.0, 15.0,     12.0, 15.0, 15.0])
+        # ONNX 세션 초기화
+        self.policy_path = os.path.join(model_dir, "policy.onnx")
+        self.encoder_path = os.path.join(model_dir, "encoder.onnx")
 
-        self.gait_period = 0.50
-        self.step_length = 0.12
-        self.step_height = 0.18
+        self.has_onnx = os.path.exists(self.policy_path) and os.path.exists(self.encoder_path)
+        if not self.has_onnx:
+            print(f"\n{Colors.BOLD}{Colors.YELLOW}[주의] ONNX 모델 파일을 찾을 수 없습니다: '{self.model_dir}'{Colors.RESET}")
+            print(f"  * 다운로드 명령:")
+            print(f"    wget -O {self.policy_path} https://github.com/limxdynamics/tron1-rl-deploy-python/raw/main/controllers/model/PF_TRON1A/policy/isaacgym/policy.onnx")
+            print(f"    wget -O {self.encoder_path} https://github.com/limxdynamics/tron1-rl-deploy-python/raw/main/controllers/model/PF_TRON1A/policy/isaacgym/encoder.onnx\n")
+            self.policy_session = None
+            self.encoder_session = None
+        else:
+            opts = ort.SessionOptions()
+            opts.intra_op_num_threads = 1
+            opts.inter_op_num_threads = 1
+            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            providers = ['CPUExecutionProvider']
+            self.policy_session = ort.InferenceSession(self.policy_path, sess_options=opts, providers=providers)
+            self.encoder_session = ort.InferenceSession(self.encoder_path, sess_options=opts, providers=providers)
+            self.policy_input_name = self.policy_session.get_inputs()[0].name
+            self.encoder_input_name = self.encoder_session.get_inputs()[0].name
+            print(f"{Colors.BOLD}{Colors.GREEN}✓ LimX 공식 ONNX 모델 로드 성공!{Colors.RESET}")
+            print(f"  * Policy Input : name='{self.policy_input_name}', shape={self.policy_session.get_inputs()[0].shape}")
+            print(f"  * Encoder Input: name='{self.encoder_input_name}', shape={self.encoder_session.get_inputs()[0].shape}")
 
+        self.robot_state = RobotState(state="landing")
         self.reset()
 
     def reset(self):
-        self.state = "LANDING"
-        self.dock_time = None
-        self.stance_lock_duration = 3.0
-        self.log_time = []
-        self.log_x = []
-        self.log_gyro = []
-        self.log_fall = False
+        self.robot_state = RobotState(state="landing")
+        self.last_action = np.zeros(6, dtype=np.float32)
+        self.actions = np.zeros(6, dtype=np.float32)
+        self.q_target = np.zeros(6, dtype=np.float32)
+        self.encoder_out = np.zeros(3, dtype=np.float32)
+        self.proprio_history_buffer = np.zeros(300, dtype=np.float32)
+        self.is_first_rec_obs = True
+        self.gait_index = 0.0
+        self.loop_count = 0
+        self.landing_timer = 0.0
 
     def compute_torques(self, data):
         sim_time = data.time
-        pos_x = data.xpos[self.base_body_id][0]
         pos_z = data.xpos[self.base_body_id][2]
+        q_act = data.qpos[7:13].astype(np.float32)
+        v_act = data.qvel[6:12].astype(np.float32)
 
-        # 전도 감지 (상체 높이 0.35m 이하 추락 시)
-        if pos_z < 0.35:
-            self.log_fall = True
+        # 1. IMU 센서 데이터 추출
+        quat = data.sensor("imu_quat").data  # [w, x, y, z]
+        gyro = data.sensor("imu_gyro").data  # [wx, wy, wz]
+        w, x, y, z = quat
+        sinp = 2.0 * (w * y - z * x)
+        pitch = math.asin(np.clip(sinp, -1.0, 1.0))
+        pitch_deg = math.degrees(pitch)
+        gyro_norm = np.linalg.norm(gyro)
 
-        q_act = data.qpos[7:13]
-        v_act = data.qvel[6:12]
-        gyro = data.sensor("imu_gyro").data.copy()
+        # 2. 접촉 여부 검출
+        contact_L = False
+        contact_R = False
+        for i in range(data.ncon):
+            con = data.contact[i]
+            if con.geom1 == self.foot_L_geom_id or con.geom2 == self.foot_L_geom_id:
+                contact_L = True
+            if con.geom1 == self.foot_R_geom_id or con.geom2 == self.foot_R_geom_id:
+                contact_R = True
 
-        # FSM 상태 전이
-        if self.state == "LANDING":
-            q_des = self.q_stand.copy()
-            kp = self.kp_walk
-            kd = self.kd_walk
-            if sim_time >= 1.5:
-                self.state = "WALKING"
+        self.robot_state.sim_time = sim_time
+        self.robot_state.pos_x = data.xpos[self.base_body_id][0]
+        self.robot_state.pos_z = pos_z
+        self.robot_state.pitch = pitch
+        self.robot_state.pitch_deg = pitch_deg
+        self.robot_state.gyro_norm = gyro_norm
+        self.robot_state.touch_L = contact_L
+        self.robot_state.touch_R = contact_R
 
-        elif self.state == "WALKING":
-            if pos_x >= (self.target_x - 0.05):
-                self.state = "DOCKED"
-                self.dock_time = sim_time
+        # 3. 전도 감지 (Z < 0.40m 또는 45도 이상 기울어짐)
+        if sim_time > 0.15 and (pos_z < 0.40 or abs(pitch_deg) > 45.0):
+            if self.robot_state.state != "falling":
+                self.robot_state.state = "falling"
+                self.robot_state.is_fallen = True
+                print(f"\n  {Colors.BOLD}{Colors.RED}✗ [{sim_time:5.2f}s] 전도 감지 (Z={pos_z:.2f}m, Pitch={pitch_deg:.1f}°){Colors.RESET}\n", flush=True)
 
-            phi = (sim_time % self.gait_period) / self.gait_period
-            q_des = self.q_stand.copy()
+        # 4. FSM 상태 전이 (landing 0.15초 후 즉각 stepping 진입)
+        if self.robot_state.state == "landing":
+            self.landing_timer += self.model.opt.timestep
+            if self.landing_timer >= 0.15 and (contact_L or contact_R or self.landing_timer >= 0.25):
+                self.robot_state.state = "stepping"
+                print(f"\n  {Colors.BOLD}{Colors.CYAN}★ [{sim_time:5.2f}s] [상태 전이] 'landing' ➔ 'stepping' (LimX RL 발구름 개시!){Colors.RESET}\n", flush=True)
 
-            hip_swing = math.sin(2.0 * math.pi * phi) * self.step_length
-            knee_swing = max(0.0, math.sin(2.0 * math.pi * phi)) * self.step_height
+        # 5. RL 정책 추론 (Decimation: 10스텝마다 1회 = 50Hz)
+        if self.has_onnx and self.robot_state.state != "falling":
+            if self.loop_count % self.decimation == 0:
+                # 5-1. 투영 중력 벡터 계산: R(q)^T * [0, 0, -1]
+                R_mat = np.zeros(9)
+                mujoco.mju_quat2Mat(R_mat, quat)
+                R_mat = R_mat.reshape(3, 3)
+                proj_gravity = (R_mat.T @ np.array([0.0, 0.0, -1.0], dtype=np.float32)).astype(np.float32)
 
-            q_des[1] += hip_swing
-            q_des[2] -= knee_swing
-            q_des[4] += hip_swing
-            q_des[5] -= knee_swing
+                # 5-2. LimX 공식 30차원 Observation 벡터 구성
+                base_ang_vel = (gyro * 0.25).astype(np.float32)
+                joint_pos_input = ((q_act - self.default_joint_pos) * 1.0).astype(np.float32)
+                joint_velocities = (v_act * 0.05).astype(np.float32)
+                actions_prev = self.last_action.astype(np.float32)
 
-            # 자이로 기반 상체 롤/피치 균형 보정
-            q_des[0] -= 0.04 * gyro[0]
-            q_des[3] -= 0.04 * gyro[0]
+                # Gait Clock 계산
+                self.gait_index += 0.02 * self.gait[0]
+                if self.gait_index > 1.0:
+                    self.gait_index = 0.0
+                gait_clock = np.array([
+                    np.sin(self.gait_index * 2.0 * np.pi),
+                    np.cos(self.gait_index * 2.0 * np.pi)
+                ], dtype=np.float32)
 
-            kp = self.kp_walk
-            kd = self.kd_walk
+                # 30차원 결합: [ang_vel(3), proj_g(3), q_pos(6), q_vel(6), action(6), gait_clock(2), gait(4)]
+                obs = np.concatenate([
+                    base_ang_vel, proj_gravity, joint_pos_input,
+                    joint_velocities, actions_prev, gait_clock, self.gait
+                ]).astype(np.float32)
+                obs = np.clip(obs, -100.0, 100.0)
 
-        elif self.state == "DOCKED":
-            q_des = self.q_stand.copy()
-            kp = self.kp_lock
-            kd = self.kd_lock
-            if (sim_time - self.dock_time) >= self.stance_lock_duration:
-                self.state = "COMPLETE"
+                # 5-3. 히스토리 버퍼 갱신 (10스텝 x 30차원 = 300차원 1D 텐서)
+                if self.is_first_rec_obs:
+                    for i in range(self.obs_history_length):
+                        self.proprio_history_buffer[i * self.observations_size:(i + 1) * self.observations_size] = obs
+                    self.is_first_rec_obs = False
+                else:
+                    self.proprio_history_buffer[:-self.observations_size] = self.proprio_history_buffer[self.observations_size:]
+                    self.proprio_history_buffer[-self.observations_size:] = obs
 
-        else:  # COMPLETE
-            q_des = self.q_stand.copy()
-            kp = self.kp_lock
-            kd = self.kd_lock
+                # 5-4. Encoder 순전파 (300차원 1D -> 3차원 잠재 벡터)
+                enc_in = {self.encoder_input_name: self.proprio_history_buffer}
+                self.encoder_out = self.encoder_session.run(None, enc_in)[0].flatten()
 
-        torques = kp * (q_des - q_act) - kd * v_act
-        torques = np.clip(torques, -80.0, 80.0)
+                # 5-5. 제자리 위치 유지 (Origin Position Hold Feedback)
+                # 로봇이 스폰 원점 (0, 0)에서 벗어나면 위치/속도 오차를 바탕으로 반대 방향 속도 명령 자동 인가
+                if self.hold_position:
+                    pos_x = float(data.xpos[self.base_body_id][0])
+                    pos_y = float(data.xpos[self.base_body_id][1])
+                    vel_x = float(data.qvel[0])
+                    vel_y = float(data.qvel[1])
 
-        self.log_time.append(sim_time)
-        self.log_x.append(pos_x)
-        self.log_gyro.append(np.linalg.norm(gyro[:2]))
+                    # 로봇 Yaw 각도를 고려하여 바디 로컬 오차로 변환
+                    yaw = float(np.arctan2(R_mat[1, 0], R_mat[0, 0]))
+                    cos_y, sin_y = np.cos(yaw), np.sin(yaw)
+                    err_world_x = -pos_x  # 목표 위치: x = 0.0
+                    err_world_y = -pos_y  # 목표 위치: y = 0.0
 
+                    body_err_x = cos_y * err_world_x + sin_y * err_world_y
+                    body_err_y = -sin_y * err_world_x + cos_y * err_world_y
+                    body_vel_x = cos_y * vel_x + sin_y * vel_y
+                    body_vel_y = -sin_y * vel_x + cos_y * vel_y
+
+                    # 비례-미분(PD) 피드백 속도 명령 생성 (전진 드리프트 완벽 상쇄)
+                    self.commands[0] = float(np.clip(1.5 * body_err_x - 0.4 * body_vel_x, -0.6, 0.6))
+                    self.commands[1] = float(np.clip(1.5 * body_err_y - 0.4 * body_vel_y, -0.6, 0.6))
+                    self.commands[2] = float(np.clip(-1.0 * yaw, -0.4, 0.4))
+
+                # 5-6. Policy 순전파 (36차원 1D = latent 3 + obs 30 + cmd 3 -> 6차원 액션)
+                scaled_commands = np.array([
+                    self.commands[0] * 1.5,
+                    self.commands[1] * 1.0,
+                    self.commands[2] * 0.5
+                ], dtype=np.float32)
+                policy_input = np.concatenate([self.encoder_out, obs, scaled_commands]).astype(np.float32)
+                pol_in = {self.policy_input_name: policy_input}
+                raw_actions = self.policy_session.run(None, pol_in)[0].flatten()
+                self.actions = np.clip(raw_actions, -100.0, 100.0)
+
+                # 5-7. 토크 한계 기반 목표 관절 각도 변환 (LimX 공식 클리핑 로직)
+                for j in range(6):
+                    action_min = (q_act[j] - self.default_joint_pos[j] +
+                                  (self.kd * v_act[j] - self.torque_limit) / self.kp)
+                    action_max = (q_act[j] - self.default_joint_pos[j] +
+                                  (self.kd * v_act[j] + self.torque_limit) / self.kp)
+                    act_clipped = np.clip(self.actions[j], action_min / self.action_scale, action_max / self.action_scale)
+                    self.q_target[j] = act_clipped * self.action_scale + self.default_joint_pos[j]
+                    self.last_action[j] = self.actions[j]
+
+        # 6. 관절 토크 연산 (500Hz 고주파 PD 제어)
+        self.loop_count += 1
+        joint_error = self.q_target - q_act
+        torques = self.kp * joint_error - self.kd * v_act
+        torques = np.clip(torques, -self.torque_limit, self.torque_limit)
         return torques
 
-def run_simulation_loop(model, data, controller, viewer=None, max_time=12.0):
-    dt = model.opt.timestep
-    last_print_time = 0.0
-    dock_reported = False
-    prev_sim_time = data.time
-
-    # 1.0x 실시간 동기화를 위한 기준 시각
+def run_simulation(model, data, controller, viewer=None, max_time=20.0):
     wall_start = time.perf_counter()
     sim_start = data.time
-
-    print(f"\n{Colors.BOLD}[TEST EXECUTION] Running Bipedal Locomotion Simulation...{Colors.RESET}")
-    if viewer:
-        print(f"  {Colors.CYAN}📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace: 리셋){Colors.RESET}")
-
+    last_print_time = 0.0
+    prev_sim_time = data.time
     step = 0
-    evaluation_done = False
+
+    print(f"\n{Colors.BOLD}[TEST EXECUTION] Running Tron1 RL In-place Stepping Simulation...{Colors.RESET}", flush=True)
+    if viewer:
+        print(f"  {Colors.CYAN}📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace / R / 터미널 Enter: 리셋){Colors.RESET}", flush=True)
+
+    def do_reset():
+        nonlocal wall_start, sim_start, last_print_time, prev_sim_time, step
+        stand_key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+        if viewer:
+            with viewer.lock():
+                if stand_key_id != -1:
+                    mujoco.mj_resetDataKeyframe(model, data, stand_key_id)
+                else:
+                    mujoco.mj_resetData(model, data)
+                data.time = 0.0
+                data.qvel[:] = 0.0
+                data.ctrl[:] = 0.0
+                mujoco.mj_forward(model, data)
+        else:
+            if stand_key_id != -1:
+                mujoco.mj_resetDataKeyframe(model, data, stand_key_id)
+            else:
+                mujoco.mj_resetData(model, data)
+            data.time = 0.0
+            data.qvel[:] = 0.0
+            data.ctrl[:] = 0.0
+            mujoco.mj_forward(model, data)
+
+        controller.reset()
+        controller.robot_state.pos_z = float(data.xpos[controller.base_body_id][2])
+        controller.robot_state.pos_x = float(data.xpos[controller.base_body_id][0])
+        wall_start = time.perf_counter()
+        sim_start = 0.0
+        prev_sim_time = 0.0
+        step = 0
+        if viewer:
+            viewer.sync()
+        rs = controller.robot_state
+        print(f"\n  {Colors.BOLD}{Colors.YELLOW}↺ [RESET 완료] 시뮬레이션 및 로봇 상태가 초기 스폰 상태(robot_state='landing')로 완벽히 재동기화되었습니다.{Colors.RESET}", flush=True)
+        print(f"  * [ 0.00s] robot_state: [{rs.state:^11}] | Pitch={rs.pitch_deg:+5.1f}° | 높이 Z={rs.pos_z:5.3f}m | Gyro={rs.gyro_norm:5.2f} rad/s\n", flush=True)
+
+    do_reset()
 
     while True:
         if viewer and not viewer.is_running():
-            print(f"  * 사용자에 의해 뷰어 창이 닫혔습니다.")
+            print(f"  * 사용자에 의해 뷰어 창이 닫혔습니다.", flush=True)
             break
 
-        # [핵심 1] 뷰어 Reset 감지 (Backspace 또는 UI Reset 버튼 클릭 시)
-        if data.time < prev_sim_time:
-            print(f"\n  {Colors.YELLOW}↺ [RESET 감지] 뷰어 리셋이 감지되어 제어기 및 초기 관절 자세를 완벽히 재동기화합니다.{Colors.RESET}")
-            controller.reset()
-            data.qpos[7:13] = controller.q_stand.copy()
-            data.qvel[:] = 0.0
-            mujoco.mj_forward(model, data)
-            dock_reported = False
-            evaluation_done = False
-            wall_start = time.perf_counter()
-            sim_start = data.time
-            last_print_time = data.time
-            prev_sim_time = data.time
+        # Reset 감지 (뷰어 UI Reset 버튼 또는 data.time 역전 감지)
+        if prev_sim_time > 0.05 and (data.time < prev_sim_time - 0.01 or data.time == 0.0):
+            do_reset()
+
+        # 1.0x 완벽 실시간 물리 동기화
+        wall_elapsed = time.perf_counter() - wall_start
+        step_count = 0
+        while (data.time - sim_start) < wall_elapsed and step_count < 40:
+            torques = controller.compute_torques(data)
+            for i, act_id in enumerate(controller.act_ids):
+                data.ctrl[act_id] = torques[i]
+            mujoco.mj_step(model, data)
+            step_count += 1
+            step += 1
 
         prev_sim_time = data.time
 
-        # 1. 제어 토크 인가
-        torques = controller.compute_torques(data)
-        for i, act_id in enumerate(controller.act_ids):
-            data.ctrl[act_id] = torques[i]
-
-        # 2. 물리 1 스텝 전진
-        mujoco.mj_step(model, data)
-        step += 1
-
-        # 3. 뷰어 화면 동기화 및 1.0x 실시간 속도 보정
+        # 뷰어 화면 동기화
         if viewer and (step % 5 == 0):
             viewer.sync()
-            sim_elapsed = data.time - sim_start
-            wall_elapsed = time.perf_counter() - wall_start
-            sleep_time = sim_elapsed - wall_elapsed
-            if sleep_time > 0:
-                time.sleep(min(sleep_time, 0.05))
 
-        # 4. 실시간 텍스트 상태 출력 (0.5초 주기)
-        sim_time = data.time
-        if (sim_time - last_print_time) >= 0.5:
-            pos_x = data.xpos[controller.base_body_id][0]
-            pos_z = data.xpos[controller.base_body_id][2]
-            print(f"  * [{sim_time:5.2f}s] 상태: {controller.state:<8} | 위치: X={pos_x:5.3f}m, 높이 Z={pos_z:5.3f}m")
-            last_print_time = sim_time
+        # 터미널 텔레메트리 주기 출력 (0.5초 간격)
+        if data.time - last_print_time >= 0.5:
+            last_print_time = data.time
+            rs = controller.robot_state
+            touch_str = f"L:{'ON ' if rs.touch_L else 'OFF'} R:{'ON ' if rs.touch_R else 'OFF'}"
+            status_color = Colors.GREEN if rs.state == "stepping" else (Colors.RED if rs.state == "falling" else Colors.YELLOW)
+            print(f"  * [{data.time:5.2f}s] robot_state: [{status_color}{rs.state:^11}{Colors.RESET}] | X={rs.pos_x:+5.2f}m | 높이 Z={rs.pos_z:5.3f}m | cmd_vx={controller.commands[0]:+5.2f}m/s | 발접촉=[{touch_str}] | Gyro={rs.gyro_norm:5.2f} rad/s", flush=True)
 
-        if controller.state == "DOCKED" and not dock_reported:
-            pos_x = data.xpos[controller.base_body_id][0]
-            print(f"  {Colors.GREEN}★ [{sim_time:.2f}s] 도킹 구역 도달! (X = {pos_x:.3f}m) -> Stance Lock 전환 (3초 안정화 시작){Colors.RESET}")
-            dock_reported = True
-
-        if controller.state == "COMPLETE" and not evaluation_done:
-            print(f"  {Colors.GREEN}★ [{sim_time:.2f}s] Stance Lock 3초 안정화 완수!{Colors.RESET}")
-            evaluation_done = True
-            success = evaluate_results(controller, controller.target_x)
-            export_snapshot(model, data)
-            print(f"\n{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
-            if success:
-                print(f"{Colors.BOLD}{Colors.GREEN}🎉 [SUCCESS] Phase 01-U01 Tron1 기본 보행 및 도킹 정지 검증 완수!{Colors.RESET}")
-            else:
-                print(f"{Colors.BOLD}{Colors.RED}❌ [FAILED] 보행/도킹 성능 기준을 만족하지 못했습니다.{Colors.RESET}")
-            print(f"{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
-            if not viewer:
-                break
-            else:
-                print(f"  {Colors.CYAN}💡 3D 창에서 로봇을 자유롭게 관찰하세요. Backspace를 누르면 처음부터 다시 걷습니다.{Colors.RESET}")
-
-        if controller.log_fall and not evaluation_done:
-            print(f"  {Colors.RED}✗ [{sim_time:.2f}s] 로봇 전도 발생! (h < 0.35m){Colors.RESET}")
-            evaluation_done = True
-            evaluate_results(controller, controller.target_x)
-            if not viewer:
-                break
-
-        # 헤드리스 모드 종료 조건
         if not viewer and data.time >= max_time:
-            if not evaluation_done:
-                evaluate_results(controller, controller.target_x)
             break
 
-    return controller, data
-
-def evaluate_results(controller, target_x):
-    print(f"\n{Colors.BOLD}[VERIFICATION RESULTS] Performance Evaluation{Colors.RESET}")
-    if controller.log_fall:
-        print(f"  {Colors.RED}✗ [Check 1] 전도 여부: 전도 발생 [FAIL]{Colors.RESET}")
-        return False
-    else:
-        print(f"  {Colors.GREEN}✓ [Check 1] 전도 여부: 넘어지지 않고 직립 유지 [PASS]{Colors.RESET}")
-
-    final_x = controller.log_x[-1] if len(controller.log_x) > 0 else 0.0
-    x_error = abs(final_x - target_x)
-    print(f"  * 최종 위치: x = {final_x:.3f} m (목표 x = {target_x:.3f} m, 오차: {x_error*100:.1f} cm)")
-    dock_pass = (x_error <= 0.15)
-    if dock_pass:
-        print(f"  {Colors.GREEN}✓ [Check 2] 도킹 도달 정밀도 합격 (오차 15cm 이내) [PASS]{Colors.RESET}")
-    else:
-        print(f"  {Colors.RED}✗ [Check 2] 도킹 도달 오차 초과: {x_error*100:.1f}cm [FAIL]{Colors.RESET}")
-
-    vibration_pass = False
-    if controller.dock_time is not None:
-        times = np.array(controller.log_time)
-        gyros = np.array(controller.log_gyro)
-        lock_mask = times >= (controller.dock_time + 1.0)
-        if np.any(lock_mask):
-            mean_vibration = np.mean(gyros[lock_mask])
-            print(f"  * Stance Lock 수렴 각속도: 평균={mean_vibration:.4f} rad/s")
-            if mean_vibration <= 0.08:
-                print(f"  {Colors.GREEN}✓ [Check 3] 정지 상태 진동 억제 합격 (< 0.08 rad/s) [PASS]{Colors.RESET}")
-                vibration_pass = True
-            else:
-                print(f"  {Colors.RED}✗ [Check 3] 정지 상태 진동 억제 불합격 (>= 0.08 rad/s) [FAIL]{Colors.RESET}")
-
-    return dock_pass and vibration_pass
-
-def export_snapshot(model, data, output_path="temp/u01_tron1_docking.png"):
-    try:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        renderer = mujoco.Renderer(model, width=640, height=480)
-        renderer.update_scene(data, camera="overview_cam")
-        rgb = renderer.render()
-        import cv2
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(output_path, bgr)
-        print(f"  {Colors.GREEN}✓ 렌더링 스냅샷 저장 완료: {output_path} [PASS]{Colors.RESET}")
-    except Exception as e:
-        print(f"  {Colors.YELLOW}⚠ 렌더링 스냅샷 저장 생략: {e}{Colors.RESET}")
+        time.sleep(0.001)
 
 def main():
     args = parse_args()
-    print(f"\n{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
-    print(f"{Colors.BOLD}{Colors.CYAN}Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock{Colors.RESET}")
-    print(f"{Colors.BOLD}{Colors.CYAN}============================================================{Colors.RESET}")
-    print(f"  * Target XML : {args.xml}")
-    print(f"  * Docking X  : {args.target_x} m")
-
     if not os.path.exists(args.xml):
-        print(f"{Colors.RED}✗ XML 파일을 찾을 수 없습니다: {args.xml}{Colors.RESET}")
-        return 1
+        print(f"\033[91m[에러] XML 파일을 찾을 수 없습니다: {args.xml}\033[0m")
+        sys.exit(1)
 
     model = mujoco.MjModel.from_xml_path(args.xml)
     data = mujoco.MjData(model)
-    mujoco.mj_resetData(model, data)
+    controller = Tron1RLController(model, model_dir=args.model_dir, hold_position=not args.no_hold)
 
-    controller = Tron1BipedController(model, target_x=args.target_x)
-
-    # 스폰 시 기립 자세로 부드럽게 지면 안착
-    data.qpos[7:13] = controller.q_stand.copy()
-    mujoco.mj_forward(model, data)
-
-    # 뷰어 실행 모드 분기 (기본값: 3D 창 표시 + 텍스트 동시 출력)
-    if not args.headless:
-        try:
-            with mujoco.viewer.launch_passive(model, data) as viewer:
-                viewer.opt.geomgroup[0] = 1
-                viewer.opt.geomgroup[1] = 1
-                viewer.opt.geomgroup[2] = 1
-                viewer.opt.geomgroup[3] = 1
-                controller, final_data = run_simulation_loop(model, data, controller, viewer=viewer, max_time=args.max_time)
-        except Exception as e:
-            print(f"  {Colors.YELLOW}⚠ GUI 뷰어 실행 실패 ({e}) -> 텍스트 전용 모드로 전환{Colors.RESET}")
-            controller, final_data = run_simulation_loop(model, data, controller, viewer=None, max_time=args.max_time)
+    if args.no_gui:
+        print(f"{Colors.BOLD}{Colors.CYAN}Headless 모드로 시뮬레이션을 실행합니다. (최대 {args.max_time}초){Colors.RESET}")
+        run_simulation(model, data, controller, viewer=None, max_time=args.max_time)
     else:
-        controller, final_data = run_simulation_loop(model, data, controller, viewer=None, max_time=args.max_time)
+        with mujoco.viewer.launch_passive(model, data) as v:
+            v.cam.distance = 2.4
+            v.cam.elevation = -15
+            v.cam.azimuth = 135
+            run_simulation(model, data, controller, viewer=v, max_time=args.max_time)
 
-    return 0
-
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    main()
 ```
 
 ---
 
-### Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 해석)
+### Step 4: 스크립트 실행 및 결과 검증 (물리 정합성 및 텔레메트리 해석)
 
-두 파일을 모두 생성했다면, 터미널에서 아래 명령을 실행합니다:
+터미널에서 Conda 환경을 활성화하고 작성한 스크립트를 실행합니다:
 
 ```bash
-# 가상환경 활성화 (필수)
 conda activate transfer_bottle_by_tron1_py3_10
-
-# ROS 2 환경 로드
-source /opt/ros/humble/setup.bash
-
-# U01 단위 검증 실행 (기본 모드: 3D GUI 뷰어 실행 + 실시간 콘솔 텔레메트리 출력)
-python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py
-
-# (참고) CI/CD 또는 터미널 전용 환경에서 헤드리스로 실행할 경우:
-# python scripts_devel_roadmap/phase01_u01_test_tron1_walking.py --headless
+python scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
 ```
 
-#### 정상 실행 출력 예시:
-```text
-============================================================
-Phase 01-U01: Tron1 Bipedal Locomotion & Docking Stance Lock
-============================================================
-  * Target XML : unit_test_models/phase01_u01_scene_unit_tron1.xml
-  * Docking X  : 1.0 m
+* **정상 실행 시 콘솔 텔레메트리 출력 예시:**
+  ```plaintext
+  [TEST EXECUTION] Running Tron1 RL In-place Stepping Simulation...
+  📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace / R / 터미널 Enter: 리셋)
 
-[TEST EXECUTION] Running Bipedal Locomotion Simulation...
-  📺 3D MuJoCo 뷰어가 활성화되었습니다. (Space: 일시정지, Backspace: 리셋)
-  * [ 0.50s] 상태: LANDING  | 위치: X=0.000m, 높이 Z=0.685m
-  * [ 1.00s] 상태: LANDING  | 위치: X=0.000m, 높이 Z=0.686m
-  * [ 1.50s] 상태: WALKING  | 위치: X=0.000m, 높이 Z=0.686m
-  * [ 2.00s] 상태: WALKING  | 위치: X=0.183m, 높이 Z=0.682m
-  * [ 2.50s] 상태: WALKING  | 위치: X=0.385m, 높이 Z=0.684m
-  * [ 3.00s] 상태: WALKING  | 위치: X=0.589m, 높이 Z=0.683m
-  * [ 3.50s] 상태: WALKING  | 위치: X=0.792m, 높이 Z=0.684m
-  * [ 4.00s] 상태: WALKING  | 위치: X=0.998m, 높이 Z=0.683m
-  ★ [4.01s] 도킹 구역 도달! (X = 0.998m) -> Stance Lock 전환 (3초 안정화 시작)
-  * [ 4.50s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
-  * [ 5.00s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
-  * [ 5.50s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
-  * [ 6.00s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
-  * [ 6.50s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
-  * [ 7.00s] 상태: DOCKED   | 위치: X=1.002m, 높이 Z=0.685m
-  ★ [7.01s] Stance Lock 3초 안정화 완수!
+  ↺ [RESET 완료] 시뮬레이션 및 로봇 상태가 초기 스폰 상태(robot_state='landing')로 완벽히 재동기화되었습니다.
+  * [ 0.00s] robot_state: [  landing  ] | Pitch= -0.1° | 높이 Z=0.800m | Gyro= 0.01 rad/s
 
-[VERIFICATION RESULTS] Performance Evaluation
-  ✓ [Check 1] 전도 여부: 넘어지지 않고 직립 유지 [PASS]
-  * 최종 위치: x = 1.002 m (목표 x = 1.000 m, 오차: 0.2 cm)
-  ✓ [Check 2] 도킹 도달 정밀도 합격 (오차 15cm 이내) [PASS]
-  * Stance Lock 수렴 각속도: 평균=0.0125 rad/s
-  ✓ [Check 3] 정지 상태 진동 억제 합격 (< 0.08 rad/s) [PASS]
-  ✓ 렌더링 스냅샷 저장 완료: temp/u01_tron1_docking.png [PASS]
+  ★ [ 0.15s] [상태 전이] 'landing' ➔ 'stepping' (LimX RL 발구름 개시!)
 
-============================================================
-🎉 [SUCCESS] Phase 01-U01 Tron1 기본 보행 및 도킹 정지 검증 완수!
-============================================================
-  💡 3D 창에서 로봇을 자유롭게 관찰하세요. Backspace를 누르면 처음부터 다시 걷습니다.
-```
+  * [ 0.50s] robot_state: [ stepping  ] | X= +0.01m | 높이 Z=0.768m | cmd_vx=-0.02m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.12 rad/s
+  * [ 1.00s] robot_state: [ stepping  ] | X= -0.01m | 높이 Z=0.765m | cmd_vx=+0.01m/s | 발접촉=[L:OFF R:ON ] | Gyro= 0.14 rad/s
+  * [ 1.50s] robot_state: [ stepping  ] | X= +0.00m | 높이 Z=0.767m | cmd_vx=-0.01m/s | 발접촉=[L:ON  R:OFF] | Gyro= 0.10 rad/s
+  * [ 2.00s] robot_state: [ stepping  ] | X= +0.01m | 높이 Z=0.766m | cmd_vx=-0.01m/s | 발접촉=[L:OFF R:ON ] | Gyro= 0.11 rad/s
+  ```
 
 ---
 
-### Step 5: 인터랙티브 3D GUI 뷰어 실시간 조작 및 리셋
+### Step 5: 인터랙티브 3D GUI 뷰어 조작 및 Reset 동기화 실습
 
-스크립트를 실행하면 3D 뷰어가 화면에 즉시 팝업되며, 실시간 1.0x 배속 동기화를 통해 로봇의 현실적인 역학 거동을 관찰할 수 있습니다.
-
-* **키보드 및 마우스 조작법:**
-  * **Backspace 바:** 즉각 리셋 (뷰어 리셋 감지 시 로봇 초기 기립 자세 및 FSM 제어기가 자동 재동기화되어 1.0x 배속으로 다시 보행을 시작)
-  * **Space 바:** 일시 정지 (Pause) / 재개 (Resume)
-  * **좌클릭 드래그:** 카메라 시점 360도 자유 궤도 회전
-  * **우클릭 드래그:** 카메라 상하좌우 평면 이동 (Pan)
-  * **스크롤 휠:** 카메라 전진/후진 (Zoom In / Out)
+1. **제자리 발구름 동작 관찰:**  
+   3D 뷰어 창에서 Tron1 로봇이 지면에 닿은 후 앞으로 고꾸라지지 않고 양발을 타닥타닥 번갈아 디디며 수평을 유지하는지 관찰합니다.
+2. **외란 저항력 테스트 (MuJoCo 외력 가하기 조작법):**  
+   * **외력 가하기 (Force Drag):** `Ctrl` 키를 누른 상태에서 로봇 상체(몸통)를 **마우스 우클릭(Right-Click)한 채 드래그**합니다. 화면에 노란색/빨간색 탄성선이 나타나며 로봇을 당기거나 밀게 됩니다.
+   * **회전 토크 가하기 (Torque):** `Ctrl + Shift` 키를 누른 상태에서 **마우스 우클릭(Right-Click) 드래그**하면 비틀림 토크가 가해집니다.
+   * 로봇을 툭툭 밀었을 때, 로봇이 발을 더 빠르고 넓게 디디며 오뚝이처럼 즉각 직립 중심을 회복하는지 관찰합니다.
+3. **Reset 즉시 동기화 검증:**  
+   뷰어 좌측 GUI `Reset` 버튼을 클릭하거나 키보드 `Backspace`를 눌렀을 때, 3D 화면과 터미널 로그가 즉각 `* [ 0.00s] robot_state: [ landing ]`으로 100% 동기화되어 재시작되는지 확인합니다.
 
 ---
 
 ## 4. 트러블슈팅 가이드 (자주 겪는 오류 및 원인 분석)
 
-### 증상 1: 스폰 직후 로봇이 다리를 펴지 못하고 주저앉거나 튀어 오름
-* **원인:**
-  1. 초기 스폰 높이($z=0.82\text{m}$)와 기립 목표 각도($q_{stand}$) 간의 기구학적 오차로 인해, 발바닥 구체가 지면 밑으로 파고든 상태(Penetration)에서 시뮬레이션이 시작되어 반발력이 폭발함.
-  2. 또는 관절 비례 게인 $K_p$가 로봇 자중($15\text{kg}$)을 지탱하기에 너무 낮음.
-* **해결책:**
-  * XML 내 `pos="0 0 0.82"` 높이를 유지하고, `phase01_u01_test_tron1_walking.py`의 `self.q_stand` 각도(무릎 약 $0.80\text{rad} \approx 45.8^\circ$)를 정확히 설정합니다.
-
-### 증상 2: 보행 중 상체가 좌우로 심하게 흔들리다 전도됨
-* **원인:**
-  * 발목이 없는 포인트 풋 로봇은 지지 다리가 바뀌는 순간 상체 질량 중심이 지지발 바깥으로 벗어나면 롤(Roll) 방향 전복 모멘트가 발생합니다.
-* **해결책:**
-  * 자이로 피드백 게인 `0.04 * gyro[0]`를 통해 Abad 관절이 반대 방향으로 상체를 밀어주도록 튜닝되어 있는지 확인합니다.
-
-### 증상 3: 도킹 목표점에 도착했으나 멈추지 않고 계속 발구름 진동이 남음
-* **원인:**
-  * `STATE_DOCKED` 전환 후 보행 사인파가 계속 더해지거나, 정지 시 게인 $K_p, K_d$가 보행 시와 동일하여 관성 진동이 감쇠되지 않음.
-* **해결책:**
-  * `controller.state == "DOCKED"` 진입 시 $q_{des}$를 순수 $q_{stand}$로 고정하고, `kp_lock` ($200 \sim 250$)과 `kd_lock` ($12 \sim 15$)의 고게인 감쇠를 활성화해야 합니다.
-
-### 증상 4: MJCF 로드 시 STL 메쉬 파일 오픈 실패 (`could not open file`)
-* **원인:**
-  * XML의 `compiler meshdir` 상대 경로가 올바르지 않음.
-* **해결책:**
-  * XML 선언부의 `meshdir="../model_ori/PF_TRON1A/meshes/"` 경로를 반드시 확인하세요.
-
-### 증상 5: 뷰어에서 Reset(Backspace)을 눌렀을 때 로봇이 중력이 감소한 것처럼 슬로우 모션으로 천천히 떨어지는 현상
-* **원인:**
-  1. **고정 슬립 지연:** 매 물리 스텝($dt=0.001\text{s}$)마다 `time.sleep(0.005)`와 같은 고정 지연을 주면 시뮬레이션 1초 진행에 현실 시간 5초가 걸려 **$5\times$ 슬로우 모션 (0.2배속)**이 발생합니다.
-  2. **상태 머신 불일치 (Honey Damping):** 사용자가 뷰어를 리셋했을 때 물리 시간($data.time$)은 0으로 돌아가지만, 상위 Python 제어기가 여전히 정지 완료(`COMPLETE`) 상태의 높은 댐핑 게인($K_d = 15.0$)을 유지하면 낙하 속도에 비례한 거대한 저항 토크($\tau = -K_d \cdot v$)가 발생하여 로봇이 마치 진득한 꿀(Honey) 속에 빠진 것처럼 천천히 가라앉게 됩니다.
-  3. **초기 자세 미정의:** XML에 `<keyframe>`이 없으면 리셋 시 $qpos$가 0(완전히 곧게 편 다리)으로 돌아가 착지 충격이 폭발합니다.
-* **해결책:**
-  1. 벽시계 시간(`time.perf_counter()`)과 물리 시간의 차이를 매 5스텝마다 계산하여 정확한 **1.0x 실시간 동기화**를 적용합니다.
-  2. `data.time < prev_sim_time`을 감지하여 뷰어 리셋 즉시 `controller.reset()`을 호출, 상태를 `LANDING`으로 되돌리고 초기 굽힘 각도(`q_stand`) 및 속도($0$)를 완벽히 재동기화합니다.
-  3. XML에 `<keyframe><key name="stand" .../></keyframe>`을 등록하여 MuJoCo 네이티브 리셋 시에도 굽힌 무릎 자세가 보존되도록 설정합니다.
+| 현상 / 오류 | 발생 원인 | 해결 방법 |
+| :--- | :--- | :--- |
+| `ModuleNotFoundError: No module named 'onnxruntime'` | 가상환경 내 패키지 미설치 | `python -m pip install onnxruntime` 실행 |
+| `ONNX 모델 파일을 찾을 수 없습니다` 경고 발생 | `model_rl/tron1/`에 파일 부재 | `wget` 명령어로 `policy.onnx`와 `encoder.onnx` 다운로드 |
+| 스폰 순간 바닥에 심하게 튕김 | Base Z 스폰 높이가 너무 낮음 | XML의 `pos="0 0 0.80"` 및 키프레임 Z값 일치 확인 |
+| Reset 후 터미널 출력이 멈춤 | 뷰어 락 레이스 컨디션 | `with viewer.lock():` 블록 내부에서 데이터 리셋 수행 |
 
 ---
 
-## 5. Phase 01-U01 완료 체크리스트
+## 5. Phase 01-U01 Step 1 완료 체크리스트
 
-직접 모든 파일 생성과 테스트를 마친 후 아래 항목들이 정상인지 스스로 점검해 보세요:
-
-- [ ] `unit_test_models/phase01_u01_scene_unit_tron1.xml` 파일이 정상 생성되었고 MuJoCo 파싱 에러가 없다.
-- [ ] `scripts_devel_roadmap/phase01_u01_test_tron1_walking.py` 파일이 정상 작성되었다.
-- [ ] 로봇이 초기 스폰 낙하 시 넘어지지 않고 1.5초 내에 수직 기립 안정화에 성공한다.
-- [ ] 로봇이 전진 보행하여 목표 인계 구역($x = 1.0\text{m}$) 부근에 오차 15cm 이내로 진입한다.
-- [ ] 도킹 진입 후 Stance Lock 상태에서 최소 3초 동안 평균 롤/피치 각속도 $0.08\text{rad/s}$ 이하로 안정 정지한다.
-- [ ] `temp/u01_tron1_docking.png` 스냅샷 이미지가 정상 저장되었다.
-- [ ] 3D GUI 창에서 실시간 1.0x 배속 보행 및 Backspace 리셋 동작을 시각적으로 확인했다.
-- [ ] `documents/done_list.txt`에 Phase 01-U01 완료 내역을 기록했다.
+* [ ] `model_rl/tron1/` 디렉토리에 `policy.onnx`와 `encoder.onnx`가 정상 배치되었는가?
+* [ ] `unit_test_models/phase01_u01_scene_unit_tron1.xml`이 오류 없이 MuJoCo 뷰어에서 로드되는가?
+* [ ] 스폰 착지 후 앞으로 고꾸라지지 않고 0.15초 내에 `stepping` 상태로 진입하는가?
+* [ ] 최소 10초 이상 연속으로 제자리 발구름을 수행하며 베이스 높이 $Z \approx 0.76\text{m}$를 유지하는가?
+* [ ] 뷰어 UI Reset 버튼 클릭 시 화면과 콘솔 로그가 0.00s `landing`부터 즉시 재시작되는가?

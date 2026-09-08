@@ -122,7 +122,7 @@ source /opt/ros/humble/setup.bash
 
 # 가상환경 내 시뮬레이터 및 비전 라이브러리 설치
 python -m pip install --upgrade pip
-python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot
+python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime
 ```
 
 #### 💡 Python 핵심 패키지(pip) 주요 역할 및 기능 요약
@@ -140,17 +140,19 @@ python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy sci
 | **`matplotlib`** | 데이터 시각화 | Tron1 보행 시 ZMP 궤적, 관절 토크 곡선, 정지 자세 안정화 수렴 시간 등을 2D 그래프로 플롯 분석 |
 | **`typeguard`** | 런타임 타입 검증 | ROS 2 파라미터 생성 라이브러리(`generate-parameter-library-py`) 의존성 충족 및 타입 안전성 보장 |
 | **`pydot`** | BT 시각화 | `py_trees` 내부의 트리 구조 시각화 및 DOT 그래프 렌더링 지원 (Conda 격리 환경 필수 의존성) |
+| **`onnxruntime`** | 기계학습 추론 | LimX Dynamics 공식 사전 훈련 강화학습 정책(policy.onnx, encoder.onnx)을 CPU에서 500Hz로 실시간 추론하여 Tron1 제자리 발구름 및 균형 제어 |
 
 ---
 
 ### 3.4. 환경 정상 연동 검증
 ```bash
-python -c "import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; print('✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!')"
+python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
 ```
 ---
 
 ## 4. Reference
 * https://github.com/google-deepmind/mujoco_menagerie.git
+* https://github.com/limxdynamics/tron1-rl-deploy-python
 ---
 
 
