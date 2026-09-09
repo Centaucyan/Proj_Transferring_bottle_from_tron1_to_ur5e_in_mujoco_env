@@ -101,6 +101,16 @@
     <camera name="overview_cam" pos="2.4 -2.6 1.8" xyaxes="0.75 0.66 0.0 -0.25 0.28 0.92" fovy="45"/>
     <camera name="docking_cam" pos="1.2 -1.2 1.0" xyaxes="0.707 0.707 0 -0.408 0.408 0.816" fovy="45"/>
     <camera name="track_cam" mode="trackcom" pos="0 -2.4 1.2" xyaxes="1 0 0 0 0.5 0.86" fovy="50"/>
+    <camera name="wide_cam" pos="1.5 -8.0 7.5" xyaxes="0.95 0.31 0.0 -0.15 0.47 0.87" fovy="55"/>
+
+    <!-- 1차 경유지 목표 마커 (X=-3.0, Y=3.0, 반투명 그린) -->
+    <geom name="wp1_marker" type="cylinder" pos="-3.0 3.0 0.002" size="0.35 0.002"
+          rgba="0.2 0.85 0.4 0.4" contype="0" conaffinity="0" group="1"/>
+
+    <!-- 2차 경유지 목표 마커: 도킹 1m 전 정렬 지점 (X=-0.70, Y=0.0, 반투명 오렌지) -->
+    <geom name="wp2_marker" type="cylinder" pos="-0.70 0.0 0.002" size="0.35 0.002"
+          rgba="0.95 0.6 0.2 0.4" contype="0" conaffinity="0" group="1"/>
+
 
     <!-- ==================== 도킹 스테이션 테이블 (pos="0.85 0 0") ==================== -->
     <body name="docking_station" pos="0.55 0 0">
@@ -301,10 +311,10 @@
   <keyframe>
     <!-- Tron1 직립 스폰 자세 및 물병 3개 트레이 적재 기본 상태 -->
     <key name="stand" qpos="
-      0 0 0.80 1 0 0 0 0.0 0.0 0.0 0.0 0.0 0.0
-      0.05  0.09 0.835 1 0 0 0
-      0.05  0.00 0.835 1 0 0 0
-      0.05 -0.09 0.835 1 0 0 0
+      -5 -4 0.80 1 0 0 0 0.0 0.0 0.0 0.0 0.0 0.0
+      -4.95  -3.91 0.835 1 0 0 0
+      -4.95  -4.00 0.835 1 0 0 0
+      -4.95 -4.09 0.835 1 0 0 0
     "/>
   </keyframe>
 </mujoco>
