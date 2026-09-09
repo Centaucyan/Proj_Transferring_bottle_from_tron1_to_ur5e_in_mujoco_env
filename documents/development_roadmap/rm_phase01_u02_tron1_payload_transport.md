@@ -415,6 +415,10 @@ U01 씬을 확장하여 다음 요소들이 완벽히 결합된 단독 단위 �
     <default class="collision">
       <geom contype="1" conaffinity="1" condim="3" group="3" friction="1.0 0.005 0.0001"/>
     </default>
+    <!-- 외형 시각화 및 물리 충돌을 동시에 수행하는 프롭용 클래스 (Group 0: 기본 뷰어 렌더링) -->
+    <default class="prop_geom">
+      <geom contype="1" conaffinity="1" condim="3" group="0" friction="1.0 0.005 0.0001"/>
+    </default>
     <default class="bottle_collision">
       <geom contype="1" conaffinity="1" condim="4" group="3" friction="1.2 0.005 0.0001"/>
     </default>
@@ -443,12 +447,12 @@ U01 씬을 확장하여 다음 요소들이 완벽히 결합된 단독 단위 �
     <!-- ==================== 도킹 스테이션 테이블 (pos="0.85 0 0") ==================== -->
     <body name="docking_station" pos="0.85 0 0">
       <!-- 테이블 상판 (두께 4cm, 상면 높이 z = 0.74m) -->
-      <geom name="table_top" type="box" pos="0.30 0 0.72" size="0.30 0.45 0.02" material="table_mat" class="collision"/>
+      <geom name="table_top" type="box" pos="0.30 0 0.72" size="0.30 0.45 0.02" material="table_mat" class="prop_geom"/>
       <!-- 테이블 지지 다리 4개 -->
-      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
-      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
-      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
-      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.35" size="0.025 0.35" material="table_mat" class="collision"/>
+      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
 
       <!-- 
         [도킹 완충 턱 (Docking Ledge)]
@@ -478,28 +482,28 @@ U01 씬을 확장하여 다음 요소들이 완벽히 결합된 단독 단위 �
       <body name="tray_assembly" pos="0.05 0 0.025">
         <!-- 트레이 바닥 지지판 (두께 8mm, 전후 12cm, 좌우 32cm) -->
         <geom name="tray_base" type="box" pos="0 0 0.004" size="0.06 0.16 0.004"
-              material="tray_mat" class="collision"/>
+              material="tray_mat" class="prop_geom"/>
         <site name="tray_center_site" pos="0 0 0.01" size="0.008" rgba="1 1 0 1"/>
 
         <!-- Slot 1 (좌측, Slot L: y = +0.09m) - 4면 가이드 림 벽체 (높이 50mm 견고한 지지) -->
-        <geom name="slot_L_wall_f" type="box" pos=" 0.036 0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_L_wall_b" type="box" pos="-0.036 0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_L_wall_l" type="box" pos=" 0 0.126 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_L_wall_r" type="box" pos=" 0 0.054 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_L_wall_f" type="box" pos=" 0.036 0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_L_wall_b" type="box" pos="-0.036 0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_L_wall_l" type="box" pos=" 0 0.126 0.033" size="0.036 0.002 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_L_wall_r" type="box" pos=" 0 0.054 0.033" size="0.036 0.002 0.025" material="tray_mat" class="prop_geom"/>
         <site name="slot_L_site" pos="0 0.09 0.01" size="0.005" rgba="0 0 1 1"/>
 
         <!-- Slot 2 (중앙, Slot C: y = 0.00m) - 4면 가이드 림 벽체 -->
-        <geom name="slot_C_wall_f" type="box" pos=" 0.036 0.00 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_C_wall_b" type="box" pos="-0.036 0.00 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_C_wall_l" type="box" pos=" 0 0.036 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_C_wall_r" type="box" pos=" 0 -0.036 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_C_wall_f" type="box" pos=" 0.036 0.00 0.033" size="0.002 0.036 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_C_wall_b" type="box" pos="-0.036 0.00 0.033" size="0.002 0.036 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_C_wall_l" type="box" pos=" 0 0.036 0.033" size="0.036 0.002 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_C_wall_r" type="box" pos=" 0 -0.036 0.033" size="0.036 0.002 0.025" material="tray_mat" class="prop_geom"/>
         <site name="slot_C_site" pos="0 0.00 0.01" size="0.005" rgba="0 1 0 1"/>
 
         <!-- Slot 3 (우측, Slot R: y = -0.09m) - 4면 가이드 림 벽체 -->
-        <geom name="slot_R_wall_f" type="box" pos=" 0.036 -0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_R_wall_b" type="box" pos="-0.036 -0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_R_wall_l" type="box" pos=" 0 -0.054 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
-        <geom name="slot_R_wall_r" type="box" pos=" 0 -0.126 0.033" size="0.036 0.002 0.025" material="tray_mat" class="collision"/>
+        <geom name="slot_R_wall_f" type="box" pos=" 0.036 -0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_R_wall_b" type="box" pos="-0.036 -0.09 0.033" size="0.002 0.036 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_R_wall_l" type="box" pos=" 0 -0.054 0.033" size="0.036 0.002 0.025" material="tray_mat" class="prop_geom"/>
+        <geom name="slot_R_wall_r" type="box" pos=" 0 -0.126 0.033" size="0.036 0.002 0.025" material="tray_mat" class="prop_geom"/>
         <site name="slot_R_site" pos="0 -0.09 0.01" size="0.005" rgba="1 0.5 0 1"/>
       </body>
 
