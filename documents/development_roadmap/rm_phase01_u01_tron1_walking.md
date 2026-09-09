@@ -632,8 +632,12 @@ class Tron1RLController:
                     # 로봇 Yaw 각도를 고려하여 바디 로컬 오차로 변환
                     yaw = float(np.arctan2(R_mat[1, 0], R_mat[0, 0]))
                     cos_y, sin_y = np.cos(yaw), np.sin(yaw)
-                    err_world_x = -pos_x  # 목표 위치: x = 0.0
-                    err_world_y = -pos_y  # 목표 위치: y = 0.0
+
+                    # 도킹 목표 마커 좌표 (X=1.0m, Y=0.0m)
+                    target_x = 1.0
+                    target_y = 0.0
+                    err_world_x = target_x - pos_x
+                    err_world_y = target_y - pos_y
 
                     body_err_x = cos_y * err_world_x + sin_y * err_world_y
                     body_err_y = -sin_y * err_world_x + cos_y * err_world_y
