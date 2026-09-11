@@ -369,22 +369,24 @@ class Tron1PayloadController:
                     self.lock_start_q = np.copy(q_act)
                     self.lock_time = sim_time
                     self.q_integral = np.zeros(6, dtype=np.float32)
-                    # 구름 정지 후 roll이 0도가 되도록 두 발의 포지션을 동일하게 대칭 맞춤
+                    # 구름 정지 후 roll이 0도, pitch가 0도가 되도록 두 발 포지션 대칭 및 고관절 신전 동시 정렬 (Simultaneous Bumpless Alignment)
                     avg_hip = float(np.clip((q_act[1] - q_act[4]) / 2.0, 0.22, 0.32))
                     avg_knee = float(np.clip((q_act[2] - q_act[5]) / 2.0, 0.40, 0.48))
-                    self.lock_target_q = np.array([0.0, avg_hip, avg_knee, 0.0, -avg_hip, -avg_knee], dtype=np.float32)
-                    print(f"\n  {Colors.BOLD}{Colors.GREEN}★ [{sim_time:5.2f}s] [발구름 정지 & 스탠스 락 체결] 두 발 5cm 후퇴 완료 (avg={avg_foot_rel:+.3f}m, diff={foot_diff:.3f}m) ➔ 대칭 관절각으로 두 발 포지션 동일 정렬 및 Roll=0° 안정화 시작!{Colors.RESET}\n", flush=True)
+                    hip_level = avg_hip + 0.18  # 상체 직립(Pitch 6.9° -> 0.0°) 고관절 보정각 (+0.18 rad)
+                    self.lock_target_q = np.array([0.0, hip_level, avg_knee, 0.0, -hip_level, -avg_knee], dtype=np.float32)
+                    print(f"\n  {Colors.BOLD}{Colors.GREEN}★ [{sim_time:5.2f}s] [발구름 정지 & 스탠스 락 체결] 두 발 5cm 후퇴 완료 (avg={avg_foot_rel:+.3f}m, diff={foot_diff:.3f}m) ➔ 양발 대칭 및 고관절 직립 동시 제어로 Roll=0° & Pitch=0° 안정화 시작!{Colors.RESET}\n", flush=True)
 
-            # 2. 구름 정지 후 roll이 0도 (±1.0° 이내)로 3초간 유지되면 READY_FOR_PICK 확립!
+            # 2. 구름 정지 후 Roll 및 Pitch가 모두 0도 (±1.0° 이내)로 3초간 유지되면 READY_FOR_PICK 확립!
             if self.is_stance_locked:
                 roll_deg_abs = abs(math.degrees(roll))
-                if roll_deg_abs < 1.0 and self.tray_vel_smooth < 0.08:
+                pitch_deg_abs = abs(math.degrees(pitch))
+                if roll_deg_abs < 1.0 and pitch_deg_abs < 1.0 and self.tray_vel_smooth < 0.08:
                     self.roll_zero_timer += dt
                     if self.roll_zero_timer >= 3.0:
                         self.fsm_state = "READY_FOR_PICK"
                         self.state_timer = 0.0
                         self.telemetry.is_ready_for_pick = True
-                        print(f"\n  {Colors.BOLD}{Colors.GREEN}✔ [{sim_time:5.2f}s] [도킹 성공] Roll=0.0° (현재 {math.degrees(roll):+.2f}°) 3.0초간 완전 수평 안정 유지 달성! => 'READY_FOR_PICK' 확립! (물병 피킹 대기){Colors.RESET}\n", flush=True)
+                        print(f"\n  {Colors.BOLD}{Colors.GREEN}✔ [{sim_time:5.2f}s] [도킹 성공] 수평안정 달성! Roll={math.degrees(roll):+.2f}°, Pitch={math.degrees(pitch):+.2f}° 3.0초간 유지 => 'READY_FOR_PICK' 확립! (물병 피킹 대기){Colors.RESET}\n", flush=True)
                 else:
                     self.roll_zero_timer = max(0.0, self.roll_zero_timer - 1.0 * dt)
 
@@ -884,7 +886,7 @@ def run_simulation(model, data, controller, viewer=None, max_time=30.0):
             phase_str = f" | Phase: [{Colors.BOLD}{t.nav_phase:<10}{Colors.RESET}]" if t.fsm_state == "DOCKING_APPROACH" else ""
             if t.fsm_state in ("STANCE_LOCK", "READY_FOR_PICK"):
                 lock_status = f"{Colors.GREEN}[락체결]{Colors.RESET}" if t.is_stance_locked else f"{Colors.YELLOW}[발5cm후퇴중]{Colors.RESET}"
-                timer_str = f" | {lock_status} Roll안정={t.roll_zero_timer:3.1f}/3.0s (Roll={t.roll_deg:+4.1f}°)"
+                timer_str = f" | {lock_status} 수평안정={t.roll_zero_timer:3.1f}/3.0s (R={t.roll_deg:+4.1f}°, P={t.pitch_deg:+4.1f}°)"
             else:
                 timer_str = ""
             print(f"  * [{t.sim_time:5.2f}s] FSM: [{c}{t.fsm_state:^16}{Colors.RESET}]{phase_str}{timer_str} | (X={t.base_x:+5.2f}, Y={t.base_y:+5.2f}) | yaw={t.yaw_deg:+5.1f}° | 범퍼={t.bumper_force:4.1f}N | 트레이진동={t.tray_vel_rms:6.4f}m/s | 물병=[{t.bottle_status}]", flush=True)
