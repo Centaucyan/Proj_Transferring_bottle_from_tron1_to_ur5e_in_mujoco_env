@@ -134,7 +134,7 @@ ROS 2에서는 노드가 실행될 때 외부 YAML 파일로부터 파라미터�
 flowchart TD
     subgraph UserInput ["사용자 파라미터 (YAML)"]
         SP["spawn_pose: [x, y, z, yaw_deg]"]
-        NB["num_bottles: 1 ~ 3"]
+        NB["bottle_slots: [bool, bool, bool]<br/>• [true, false, true]: 1번(좌), 3번(우) 적재<br/>• [false, false, false]: 빈 트레이 주행"]
     end
 
     subgraph RobotKinematics ["MuJoCo 물리 엔진 (시뮬레이션 초기화)"]
@@ -143,22 +143,26 @@ flowchart TD
         GetSites["트레이 슬롯 사이트의 월드 절대좌표 획득<br/>data.site_xpos['slot_L_site']<br/>data.site_xpos['slot_C_site']<br/>data.site_xpos['slot_R_site']"]
     end
 
-    subgraph BottlePlacement ["물병 freejoint 자동 동기화"]
-        PlaceB["각 물병 freejoint qpos[0:3] = site_xpos + [0, 0, 0.035m]<br/>물병 회전 quat = 로봇 회전 quat 대입"]
-        Isolate["미적재 물병은 바닥 아래 (z = -10.0m) 격리"]
+    subgraph BottlePlacement ["물병 freejoint 자동 동기화 및 마스킹"]
+        PlaceB["True인 슬롯의 물병만 site_xpos에 안착<br/>qpos[0:3] = site_xpos + [0, 0, 0.035m]<br/>물병 회전 quat = 로봇 회전 quat"]
+        Isolate["False인 슬롯의 물병은 바닥 아래 (z = -10.0m) 격리<br/>(물리 충돌/질량/센서 감지 100% 배제)"]
     end
 
     SP --> SetRoot
     SetRoot --> FK
     FK --> GetSites
     GetSites --> PlaceB
-    NB --> Isolate
+    NB -->|슬롯별 True/False 분기| PlaceB
+    NB -->|False 마스킹| Isolate
 ```
 
 1. **트레이 본체는 로봇의 자식 바디:** XML 계층 구조상 `<body name="tray_assembly">`는 `<body name="base_Link">`의 자식이므로, 베이스의 전역 위치와 회전 변환 행렬 $\mathbf{T}_{world}^{base}$에 따라 트레이의 위치 $\mathbf{T}_{world}^{tray}$는 물리 엔진에 의해 자동으로 결정됩니다.
 2. **물병은 독립된 자유 물체(`freejoint`):** 물병은 트레이에 용접된 것이 아니므로 별도의 좌표를 가집니다.
 3. **Site의 전역 좌표 획득:** 슬롯 바닥 정중앙에 선언된 사이트(`slot_L_site`, `slot_C_site`, `slot_R_site`)의 전역 좌표는 `mj_forward` 호출 후 `data.site_xpos[site_id]`에 3차원 벡터로 정확히 계산되어 들어옵니다.
-4. **결과:** 사용자가 로봇을 $(X=-10\,\text{m}, Y=+5\,\text{m}, \text{Yaw}=90^\circ)$ 등 임의의 위치에 스폰시키더라도, 물병은 사용자의 수동 계산 없이 **100% 트레이 슬롯 안착 상태로 자동 동기화**됩니다.
+4. **슬롯별 개별 온/오프 및 빈 트레이 지원 (`bottle_slots: [bool, bool, bool]`):**
+   * 사용자가 `[true, false, true]`로 설정하면 1번(좌), 3번(우) 슬롯에만 물병이 배치되고 가운데 2번 슬롯은 비워집니다.
+   * 사용자가 `[false, false, false]`로 설정하면 3개 물병이 모두 바닥 아래($z=-10.0\,\text{m}$)로 격리되어, **트론1이 빈 트레이 상태로 주행 및 도킹하는 시나리오**를 완벽히 모사할 수 있습니다.
+5. **결과:** 사용자가 로봇을 $(X=-10\,\text{m}, Y=+5\,\text{m}, \text{Yaw}=90^\circ)$ 등 임의의 위치에 스폰시키더라도, 물병은 사용자의 수동 계산 없이 **100% 트레이 슬롯 안착 상태로 자동 동기화**됩니다.
 
 ---
 
@@ -438,8 +442,12 @@ tron1_controller:
     # 1. Tron1 초기 스폰 포즈 [X (m), Y (m), Z (m), Yaw (deg)]
     spawn_pose: [-5.0, -4.0, 0.80, 0.0]
 
-    # 2. 적재 물병 개수 (1: 좌측 비대칭, 2: 좌우 2개, 3: 3개 만재)
-    num_bottles: 3
+    # 2. 트레이 슬롯별 물병 적재 마스크 [Slot 1 (좌), Slot 2 (중앙), Slot 3 (우)]
+    # • [true, true, true]: 물병 3개 만재
+    # • [true, false, true]: 1번, 3번만 적재 (가운데 비움)
+    # • [true, false, false]: 1번(좌측)만 적재 (비대칭 하중)
+    # • [false, false, false]: 물병 없음 (빈 트레이 주행 및 도킹 테스트)
+    bottle_slots: [true, true, true]
 
     # 3. 자율 주행 경유지 리스트 (2D 평면 좌표 X, Y)
     # WP1: 코너 우회 지점, WP2: 테이블 1m 전 정렬 지점, WP3: 범퍼 접촉 목표점
@@ -499,7 +507,7 @@ class Tron1ControllerNode(Node):
         # 1. ROS 2 파라미터 선언 및 로드
         # -------------------------------------------------------------
         self.declare_parameter('spawn_pose', [-5.0, -4.0, 0.80, 0.0])
-        self.declare_parameter('num_bottles', 3)
+        self.declare_parameter('bottle_slots', [True, True, True])
         self.declare_parameter('waypoints', [-3.0, 3.0, -0.70, 0.0, 0.27, 0.0])
         self.declare_parameter('nav_max_speed', 0.65)
         self.declare_parameter('docking_creep_speed', 0.15)
@@ -507,7 +515,7 @@ class Tron1ControllerNode(Node):
         self.declare_parameter('vibration_hold_time_s', 3.0)
 
         self.spawn_pose = self.get_parameter('spawn_pose').value
-        self.num_bottles = self.get_parameter('num_bottles').value
+        self.bottle_slots = self.get_parameter('bottle_slots').value
         raw_wps = self.get_parameter('waypoints').value
         # 1차원 배열로 들어온 waypoints를 2D 튜플 리스트로 변환
         self.waypoints = [(raw_wps[i], raw_wps[i+1]) for i in range(0, len(raw_wps), 2)]
@@ -516,8 +524,9 @@ class Tron1ControllerNode(Node):
         self.bumper_threshold_n = self.get_parameter('bumper_threshold_n').value
         self.vibration_hold_time_s = self.get_parameter('vibration_hold_time_s').value
 
+        loaded_count = sum(1 for s in self.bottle_slots if s)
         self.get_logger().info(f"  * 스폰 포즈: {self.spawn_pose}")
-        self.get_logger().info(f"  * 물병 수량: {self.num_bottles}EA")
+        self.get_logger().info(f"  * 물병 슬롯 마스크: {self.bottle_slots} (적재: {loaded_count}EA)")
         self.get_logger().info(f"  * 경유지 목록: {self.waypoints}")
 
         # -------------------------------------------------------------
@@ -726,7 +735,7 @@ ros2 run tron1_locomotion tron1_controller
 ```text
 [INFO] [tron1_controller]: === [Tron1Controller] 초기화 시작 ===
 [INFO] [tron1_controller]:   * 스폰 포즈: [-5.0, -4.0, 0.8, 0.0]
-[INFO] [tron1_controller]:   * 물병 수량: 3EA
+[INFO] [tron1_controller]:   * 물병 슬롯 마스크: [True, True, True] (적재: 3EA)
 [INFO] [tron1_controller]:   * 경유지 목록: [(-3.0, 3.0), (-0.7, 0.0), (0.27, 0.0)]
 [INFO] [tron1_controller]: === [Tron1Controller] 노드 구동 완료 (50Hz 제어 / 10Hz 상태 보고) ===
 [INFO] [tron1_controller]: >> FSM: LANDING -> IN_PLACE_HOLD
