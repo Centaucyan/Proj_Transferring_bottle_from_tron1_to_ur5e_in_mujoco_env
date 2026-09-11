@@ -1,5 +1,5 @@
 # Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
-* **Update:** 2026.09.04.
+* **Update:** 2026.09.11.
 * **GitHub:** https://github.com/Centaucyan/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env.git
 ---
 
@@ -12,7 +12,73 @@
     * **Robot:** LimX Dynamics Tron1(2족 보행 로봇), Universal Robots UR5e(로봇팔), Robotiq 2F-85(그리퍼)
     * **Sensor:**  Realsense D435i(RGB-D 카메라)
 
-![work_space](documents/scenario/work_space_01.png)
+### 1.1. 작업 공간 및 환경 레이아웃 (Workspace Layout)
+![work_space](documents/scenario/work_space_02.png)
+
+### 1.2. 시나리오 상의 실제 ROS 2 상호 통신 흐름 (Multi-Robot Sequence Flow)
+Tron1(이족보행 AMR)이 물병 3개를 적재·운반하여 작업대 테이블에 정밀 도킹하고 수평 정적 안정($Roll \approx 0.0^\circ, Pitch \approx 0.0^\circ$, 0.000mm 부동)을 달성하면, **상태 토픽(`/tron1/status: READY_FOR_PICK`)을 발행하여 UR5e 로봇팔에 인계 준비를 알리고, UR5e가 D435i 비전 인식 및 MoveIt 2 충돌 회피 Pick & Place를 수행하는 전체 ROS 2 통신 아키텍처 및 인터락(Interlock) 시퀀스**입니다.
+
+![ros2_communication_flow](documents/development_roadmap/ros2_communication_flow.png)
+
+#### 📡 주요 ROS 2 인터페이스 명세
+
+| 구분 | 토픽 / 메시지명 | 메시지 타입 | 송신 노드 ➔ 수신 노드 | 핵심 기능 및 상호 연동 설명 |
+| :---: | :--- | :--- | :---: | :--- |
+| **도킹 상태** | `/tron1/status` | `std_msgs/String`<br>`(또는 Custom Status)` | `tron1_controller` ➔ `bottle_detector_3d`<br>`ur5e_pick_place` | 발 5cm 후퇴 3점 지지, 동시 수평화 및 3초 무진동 통과 후 **`READY_FOR_PICK` (도킹 고정 완료)** 신호 브로드캐스트 |
+| **비전 좌표** | `/bottle/centroid_3d` | `geometry_msgs/PointStamped` | `bottle_detector_3d` ➔ `ur5e_pick_place` | Eye-in-Hand D435i로 트레이 상공을 스캔하여 RANSAC 평면 제거 후 산출된 물병의 3D 중심점($X,Y,Z$) 및 TF2 변환 좌표 전달 |
+| **작업 완료** | `/tron1/cmd_undock` | `std_msgs/Bool` | `ur5e_pick_place` ➔ `tron1_controller` | 물병 3개 이송 완료(`ALL_BOTTLES_TRANSFERRED`) 후 Tron1에 클램프 해제, 0.15m 후진 언도킹 및 복귀 보행 지시 |
+
+<details>
+<summary><b>🔍 GitHub 인터랙티브 시퀀스 다이어그램 (Mermaid Code) 펼쳐보기</b></summary>
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Tron1 as Tron1 이족보행 AMR<br/>(tron1_controller)
+    participant ROS2 as ROS 2 통신 버스<br/>(Topics / Actions)
+    participant Vision as Eye-in-Hand D435i<br/>(bottle_detector_3d)
+    participant UR5e as UR5e + MoveIt 2<br/>(ur5e_pick_place)
+
+    rect rgb(240, 248, 255)
+    note over Tron1: Phase 1: Tron1 자율 보행 및 정밀 도킹
+    Tron1->>Tron1: 웨이포인트 주행 (WP0 ➔ WP1 ➔ 정면 정렬)
+    Tron1->>Tron1: 극저속 크리핑 (0.04m/s) 및 범퍼 접촉(F ≥ 5N) 감지
+    Tron1->>Tron1: 발 5cm 후퇴 3점 지지 형성 및 발구름 정지 (Stance Lock)
+    Tron1->>Tron1: 고관절 신전(+0.18rad) 동시 수평화 (Roll: -0.02°, Pitch: +0.13°)
+    Tron1->>Tron1: 3.0s 무진동 수평 인터락 통과 ➔ 도킹 클램프 체결 (0.000mm 부동)
+    end
+
+    rect rgb(245, 255, 245)
+    note over Tron1, UR5e: Phase 2: 도킹 완료 핸드셰이크 & 상태 브로드캐스트
+    Tron1->>ROS2: [Topic] /tron1/status = READY_FOR_PICK (True)
+    ROS2->>Vision: /tron1/status 수신 ➔ 스캔 트리거 인가
+    ROS2->>UR5e: /tron1/status 수신 ➔ 매니퓰레이션 준비
+    end
+
+    rect rgb(255, 245, 255)
+    note over Vision, UR5e: Phase 3: Eye-in-Hand 3D 비전 인식 & TF2 좌표 변환
+    Vision->>Vision: D435i RGB-D 영상 취득 (Scan Pose 트레이 하향 조준)
+    Vision->>Vision: OpenCV & Open3D RANSAC 평면 제거 + 물병 3D 중심점 추출
+    Vision->>ROS2: [Topic] /bottle/centroid_3d (PointStamped + TF2 변환)
+    ROS2->>UR5e: /bottle/centroid_3d 전달 (파지 목표 좌표)
+    end
+
+    rect rgb(255, 250, 240)
+    note over UR5e: Phase 4: MoveIt 2 충돌 회피 Pick & Place 반복
+    UR5e->>UR5e: Approach(접근) ➔ Grasp(파지) ➔ Lift(수직 10cm) ➔ Place(테이블 안착)
+    UR5e->>UR5e: Scan Pose 복귀 및 물병 3개 순차 반복 이송 완료
+    end
+
+    rect rgb(255, 240, 240)
+    note over UR5e, Tron1: Phase 5: 작업 완료 및 안전 언도킹 복귀
+    UR5e->>ROS2: [Topic] /tron1/cmd_undock = ALL_BOTTLES_TRANSFERRED (True)
+    ROS2->>Tron1: /tron1/cmd_undock 수신
+    Tron1->>Tron1: Stance Lock 해제 ➔ 0.15m 후진 언도킹 ➔ 시작 위치 복귀 보행
+    end
+```
+
+</details>
+
 ---
 
 ## 2. 환경
