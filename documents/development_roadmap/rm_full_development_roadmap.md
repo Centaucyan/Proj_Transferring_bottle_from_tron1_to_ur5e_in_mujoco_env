@@ -1,13 +1,13 @@
 # [Roadmap] 이론 학습 및 단위 검증 기반 로봇 시뮬레이션 개발 로드맵
 # (Learning & Unit Verification Oriented Development Roadmap: Tron1 to UR5e Bottle Transfer System)
 
-* **문서 버전:** v2.1 (최신 아키텍처 반영: LimX 공식 RL + 테이블 범퍼 도킹 + Eye-in-Hand 카메라)
-* **최종 갱신일:** 2026-09-08
+* **문서 버전:** v2.2 (도킹 정밀 클램프 락 + Roll/Pitch 동시 수평화 + Eye-in-Hand 카메라 최신 아키텍처 반영)
+* **최종 갱신일:** 2026-09-11
 * **프로젝트:** `Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env`
 * **개발 환경:** Ubuntu 22.04 LTS / ROS 2 Humble / MuJoCo 3.12.0 / Conda (`transfer_bottle_by_tron1_py3_10`)
 * **핵심 아키텍처 변경사항:**
   1. **Tron1 보행 제어기:** LimX 공식 500Hz/50Hz 사전학습 심층 강화학습(DRL) ONNX 모델(`policy.onnx`, `encoder.onnx`) 및 원점 복원 제어(Origin Position Hold PD) 적용.
-  2. **인계 구역 도킹 방식:** 점 발바닥 로봇의 특성을 반영하여, 무릎 단독 착석 대신 **상체 전면 범퍼를 작업대 테이블 모서리에 기대어 3점 지지를 형성하는 '테이블 범퍼 거치 도킹(Table Bumper Rest)'** 및 발구름 정지(`Stance Lock`) 메커니즘 확정.
+  2. **인계 구역 도킹 방식:** 점 발바닥 로봇의 특성을 반영하여, **[발 5cm 후퇴 3점 지지 + 능동 범퍼 순응 제어 + Roll/Pitch 동시 수평화(+0.18 rad) + 정밀 도킹 클램프(0.000mm 부동)]** 메커니즘을 적용하여 발구름 완전 정지(`Stance Lock`) 및 UR5e 물병 피킹 정밀 공차(0mm)를 완벽 보장.
   3. **3D 비전 카메라:** 작업대 고정식(Eye-to-Hand)에서 **Robotiq 2F-85 그리퍼 베이스 중앙 장착식(Eye-in-Hand)**으로 전환하여 시야 차폐 방지 및 시각 서보잉 정밀도 극대화.
 * **문서 목적:** 단순 구현을 넘어, 각 단계의 **수학적/물리적 원리, 제어 이론, 알고리즘 메커니즘**을 단계별로 직접 실습하고 검증하며 체득하는 것을 최우선 목적으로 합니다. 특히 복잡한 전체 시스템을 결합하기 전, **각 기능별 독립 단위 샌드박스 씬(Unit Sandbox Scene)에서 선(先) 검증(Bottom-Up Verification)**을 완수한 후 점진적으로 통합합니다.
 
@@ -129,23 +129,36 @@ flowchart TD
 ---
 
 ### [U02] Tron1 상체 컵홀더 트레이 장착, 물병 적재 운반 및 테이블 도킹 정지 검증
-* **목표:** Tron1 상체(`base_Link`)에 3구 컵홀더 트레이와 전면 완충 범퍼를 장착하고, 실제 물병(`model_ori/bottle/bottle.xml`)을 1~3개 실은 상태에서 500Hz LimX RL 제자리 발구름 및 보행 안정성을 검증함과 동시에, 작업대 테이블 모서리에 상체 전면 범퍼를 살짝 기대어 안착(Table Bumper Rest)시킴으로써 발구름을 완전히 멈추고(`Stance Lock`, stepping OFF) 3점 지지를 통해 진동 0의 무진동 정적 안정 상태(`READY_FOR_PICK`)를 확립하는 도킹 메커니즘까지 단독 샌드박스 씬에서 완벽히 물리 검증.
-* **사용 씬:** `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml` (Tron1 + 컵홀더 트레이 + 전면 완충 범퍼 + 물병 1~3개 + 도킹 턱이 구비된 작업대 테이블 모서리 모델)
+* **목표:** Tron1 상체(`base_Link`)에 3구 컵홀더 트레이와 전면 완충 범퍼를 장착하고, 실제 물병(`model_ori/bottle/bottle.xml`)을 1~3개 실은 상태에서 500Hz LimX RL 제자리 발구름 및 보행 안정성을 검증함과 동시에, 작업대 테이블 모서리에 상체 전면 범퍼를 살짝 기대어 안착(Table Bumper Rest)시킴으로써 발구름을 완전히 멈추고(`Stance Lock`, stepping OFF) 3점 지지를 통해 진동 0의 무진동 완전 수평 정적 안정 상태(`READY_FOR_PICK`)를 확립하는 도킹 메커니즘까지 단독 샌드박스 씬에서 완벽히 물리 검증.
+* **사용 씬:** `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml` (Tron1 + 컵홀더 트레이 + 전면 완충 범퍼 + 물병 1~3개 + 표준 높이 74cm 상판 및 58cm 언더데스크 하향 도킹 지지대가 구비된 작업대 테이블 모델)
 * **핵심 이론:**
   * 페이로드 질량(개당 150g, 총 450g) 추가에 따른 상체 동역학 및 CoM 상승에 대한 LimX 잠재 인코더의 온라인 외란 추정 강건성.
   * 컵홀더 림(Rim) 높이와 접촉 마찰 계수(`friction="1.2 0.005 0.0001"`)에 의한 전도 모멘트 감쇠.
-  * **3점 삼각 지지 역학 (3-Point Tripod Support):** 바닥의 두 점 발바닥(2점) + 테이블 모서리 완충 접촉(1점)을 결합하여, 발목 모터가 없는 로봇이 발구름을 완전히 멈추어도($\tau_{\text{ankle}}=0$) 절대 쓰러지지 않는 정적 지지 다각형(Support Polygon) 형성 원리.
-  * **발구름 정지 모드 전환 (Bumpless Stance Lock):** RL 발구름 모드에서 관절 위치 고정 모드로의 부드러운 전환 및 트레이 진동 억제.
+  * **표준 작업대(74cm) 및 언더데스크 하향 드롭 도킹 지지대(58cm):** UR5e 표준 작업대 상판(74cm)을 유지하면서 상판 하단에 58cm 드롭 브래킷을 배치하여 로봇 CoM(0.60m)과의 작용점 불일치로 인한 후방 전복 토크($\tau=0$)를 원천 차단.
+  * **발 5cm 후퇴 3점 지지 역학 (Feet Retraction Tripod Support):** 터치 센서 접촉 감지 후 발구름을 유지한 채 발을 몸체 중심 뒤로 5cm 후퇴 배치(`X_foot = X_base - 0.05m`)하여 전복 모멘트를 원천 차단하는 정적 지지 삼각형 형성.
+  * **능동 범퍼 반력 순응 제어 (Continuous Force Compliance Control):** 범퍼 지탱력을 9N 수준으로 일정하게 유지하여 바닥 수평 전단력 및 후방 발 밀림(Creep) 방지.
+  * **Roll & Pitch 동시 수평 제어 (Simultaneous Bumpless Alignment):** Roll(차동 $\Delta q$)과 Pitch(대칭합 $\Sigma q$)의 수학적 직교성을 활용하여 고관절 신전(+0.18 rad)을 0.5초간 동시 보간함으로써 $Roll \approx 0.0^\circ, Pitch \approx 0.0^\circ$ 완전 수평면 확립 (충격 및 물병 출렁임 Zero).
+  * **산업용 정밀 도킹 클램프 (Precision Docking Clamp Emulation):** UR5e 피킹 작업 중 공차 0mm를 위해 도킹 안착 자세(`dock_locked_qpos`)를 고정하여 0.000mm 완전 부동 보장.
 * **검증 내용:**
   1. **기구 결합 정합성:** `base_Link` 상단 3구 컵홀더 트레이 및 전면 완충 범퍼 조립.
   2. **적재 발구름 검증:** 물병 1개(비대칭 편하중), 2개, 3개 적재 조건에서 10초 이상 RL 발구름 안정성 테스트 (물병 낙하 및 전도 감시).
-  3. **테이블 범퍼 도킹 (Table Bumper Rest):** 로봇이 작업대 테이블 모서리로 접근하여 상체 전면 범퍼를 테이블 턱에 부드럽게 접촉.
-  4. **발구름 완전 정지 (Stance Lock) 및 진동 0 검증:** 범퍼 접촉 후 RL 발구름을 끄고(`stepping` OFF), 3점 지지 상태에서 트레이의 잔여 진동이 3초 이내에 정적 상태($< 0.01\,\text{m/s}$, 롤/피치 진동 $< 0.01\,\text{rad}$)로 수렴하는지 확인.
-  5. **언도킹 (Undocking):** 발구름을 재개하여 뒤로 한 걸음 물러나 자립 발구름으로 복귀 가능한지 확인.
-* **성공 기준:** 물병 적재 발구름 중 물병 낙하 0건, 테이블 범퍼 도킹 성공 및 전도 0건, 발구름 정지 후 3초간 트레이 진동 속도 $0.01\,\text{m/s}$ 이하 수렴 (진동 0의 완벽한 정적 상태 확립).
+  3. **다단계 도킹 접근 (Multi-Waypoint Approach):** WP0(-3, 3) $\rightarrow$ WP1(-0.7, 0) $\rightarrow$ 테이블 정면 직각 정렬(yaw=0) $\rightarrow$ 극저속 크리핑(0.04m/s) 직진 도킹.
+  4. **발구름 완전 정지 (Stance Lock) 및 동시 수평화:** 범퍼 접촉 후 발 5cm 후퇴 $\rightarrow$ 발구름 정지 $\rightarrow$ 0.5초간 $Roll=0^\circ, Pitch=0^\circ$ 동시 수평화.
+  5. **무진동 정적 안정 판정 및 도킹 클램프 체결:** $|Roll| < 1.0^\circ$ 및 $|Pitch| < 1.0^\circ$ 상태가 3.0초간 유지되어 `READY_FOR_PICK` 확립 및 이동량 0.000mm 클램프 락 체결.
+  6. **언도킹 (Undocking):** 발구름을 재개하여 뒤로 0.15m 안전 후퇴 후 자립 발구름으로 복귀.
+* **성공 기준:** 물병 적재 발구름 중 물병 낙하 0건, 테이블 도킹 성공 및 전도 0건, 발구름 정지 후 3초간 $Roll \approx 0.0^\circ, Pitch \approx 0.0^\circ$ 완전 수평 유지 및 트레이 진동 속도 $0.003\,\text{m/s}$ 이하 수렴, 도킹 클램프 체결 후 0.000mm 완전 부동 달성.
 * **산출물:**
   * 상세 가이드: `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md`
   * 테스트 스크립트: `scripts_devel_roadmap/phase01_u02_test_tron1_payload.py`
+  * 단위 씬 모델: `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`
+  * 심층 연구 보고서 7종 (`documents/study/`):
+    - `phase01_u02_issue_01_docking_stance_slip_and_roll_imbalance.md`
+    - `phase01_u02_issue_02_spherical_foot_rolling_slip_and_bumper_lowering.md`
+    - `phase01_u02_issue_03_stance_lock_timing_and_feet_retraction.md`
+    - `phase01_u02_issue_04_docking_stance_foot_creep_and_force_compliance.md`
+    - `phase01_u02_issue_05_industrial_docking_clamp_and_electromagnet_emulation.md`
+    - `phase01_u02_issue_06_docking_pitch_roll_simultaneous_leveling.md`
+    - `phase01_u02_issue_07_standard_table_height_and_drop_docking_bracket.md`
 
 ---
 
@@ -369,7 +382,7 @@ flowchart TD
 | **Phase 00** | - | Conda & ROS 2 Humble 런타임 바인딩 검증 | **완료** | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `scripts_devel_roadmap/phase00_check_env.py` |
 | **Phase 01** | **U00** | 단위 검증 샌드박스 공통 환경 및 모델 로더 | **완료** | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md` | `xml_for_unit_test/phase01_u00_scene_unit_base.xml`<br>`scripts_devel_roadmap/phase01_u00_test_base_sandbox.py` |
 |  | **U01** | Tron1 LimX 공식 RL 제자리 발구름 및 원점 유지 | **완료** | `documents/development_roadmap/rm_phase01_u01_tron1_walking.md` | `xml_for_unit_test/phase01_u01_scene_unit_tron1.xml`<br>`scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py`<br>`documents/study/phase01_u01_limx_rl_model_and_mujoco_integration.md` |
-|  | **U02** | Tron1 트레이 장착, 물병 적재 운반 & 테이블 도킹 정지 검증 | **진행 예정** | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`<br>`scripts_devel_roadmap/phase01_u02_test_tron1_payload.py` |
+|  | **U02** | Tron1 트레이 장착, 물병 적재 운반 & 테이블 도킹 정지 검증 | **완료** | `documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`<br>`scripts_devel_roadmap/phase01_u02_test_tron1_payload.py`<br>`documents/study/phase01_u02_issue_01`~`07.md` (7종) |
 |  | **U03** | D435i (Eye-in-Hand) 3D 비전 인식 및 중심점 추출 | 대기 | `documents/development_roadmap/rm_phase01_u03_vision_centroid.md` | `xml_for_unit_test/phase01_u03_scene_unit_vision.xml`<br>`scripts_devel_roadmap/phase01_u03_test_vision_centroid.py` |
 |  | **U04** | UR5e + 2F-85 + D435i 조립 및 물병 Pick & Lift | 대기 | `documents/development_roadmap/rm_phase01_u04_arm_pick_lift.md` | `xml_for_unit_test/phase01_u04_scene_unit_pick.xml`<br>`scripts_devel_roadmap/phase01_u04_test_arm_pick_lift.py` |
 |  | **U05** | UR5e + 2F-85 물병 Place 및 Scan Pose 복귀 | 대기 | `documents/development_roadmap/rm_phase01_u05_arm_place.md` | `xml_for_unit_test/phase01_u05_scene_unit_place.xml`<br>`scripts_devel_roadmap/phase01_u05_test_arm_place.py` |

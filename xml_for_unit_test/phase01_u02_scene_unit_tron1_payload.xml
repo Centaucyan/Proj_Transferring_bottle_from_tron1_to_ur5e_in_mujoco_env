@@ -112,21 +112,28 @@
           rgba="0.95 0.6 0.2 0.4" contype="0" conaffinity="0" group="1"/>
 
 
-    <!-- ==================== 도킹 스테이션 테이블 (pos="0.85 0 0") ==================== -->
+    <!-- ==================== 도킹 스테이션 테이블 (pos="0.55 0 0") ==================== -->
     <body name="docking_station" pos="0.55 0 0">
-      <!-- 테이블 상판 (두께 4cm, 상면 높이 z = 0.64m) -->
-      <geom name="table_top" type="box" pos="0.30 0 0.62" size="0.30 0.45 0.02" material="table_mat" class="prop_geom"/>
-      <!-- 테이블 지지 다리 4개 -->
-      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
-      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
-      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
-      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
+      <!-- 1. 표준 테이블 상판 (두께 4cm, 상면 높이 z = 0.74m: UR5e 작업대 표준 규격 원복) -->
+      <geom name="table_top" type="box" pos="0.30 0 0.72" size="0.30 0.45 0.02" material="table_mat" class="prop_geom"/>
+
+      <!-- 2. 테이블 지지 다리 4개 (높이 0.70m) -->
+      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+
+      <!-- 3. 언더데스크 하향 드롭 브래킷 프레임 (상판 하단 z=0.70m에서 현수 고정) -->
+      <geom name="dock_hanger_L" type="box" pos="0.0  0.22 0.64" size="0.03 0.03 0.06" material="table_mat" class="prop_geom"/>
+      <geom name="dock_hanger_R" type="box" pos="0.0 -0.22 0.64" size="0.03 0.03 0.06" material="table_mat" class="prop_geom"/>
+      <geom name="dock_backing_plate" type="box" pos="-0.01 0 0.58" size="0.01 0.25 0.12" material="table_mat" class="prop_geom"/>
 
       <!-- 
-        [도킹 완충 턱 (Docking Ledge)]
-        Tron1 범퍼(z ≈ 0.62m)를 완벽히 포용할 수 있도록 상하 24cm 높이의 대형 완충 턱 배치
+        4. 도킹 완충 패드 및 터치 접촉 턱 (Docking Ledge)
+        - 중심 높이 z = 0.58m (상하 범위 0.46m ~ 0.70m, 상판 하단과 일체화 결합)
+        - Tron1 저중심 범퍼(z ≈ 0.56~0.60m)를 정확히 수용하여 전복 토크(τ=0) 차단
       -->
-      <geom name="table_bumper_ledge" type="box" pos="-0.05 0 0.61" size="0.03 0.25 0.12"
+      <geom name="table_bumper_ledge" type="box" pos="-0.05 0 0.58" size="0.03 0.25 0.12"
             material="ledge_mat" class="bumper_collision"/>
     </body>
 
