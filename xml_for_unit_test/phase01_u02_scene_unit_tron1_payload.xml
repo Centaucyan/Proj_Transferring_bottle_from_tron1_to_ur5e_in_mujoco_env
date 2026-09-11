@@ -95,7 +95,7 @@
 
     <!-- 기준 바닥 평면 -->
     <geom name="floor" type="plane" size="0 0 0.05" material="matplane"
-          contype="1" conaffinity="1" friction="1.0 0.005 0.0001" condim="3"/>
+          contype="1" conaffinity="1" friction="1.0 0.005 0.02" condim="6"/>
 
     <!-- 카메라 시점 -->
     <camera name="overview_cam" pos="2.4 -2.6 1.8" xyaxes="0.75 0.66 0.0 -0.25 0.28 0.92" fovy="45"/>
@@ -114,19 +114,19 @@
 
     <!-- ==================== 도킹 스테이션 테이블 (pos="0.85 0 0") ==================== -->
     <body name="docking_station" pos="0.55 0 0">
-      <!-- 테이블 상판 (두께 4cm, 상면 높이 z = 0.74m) -->
-      <geom name="table_top" type="box" pos="0.30 0 0.72" size="0.30 0.45 0.02" material="table_mat" class="prop_geom"/>
+      <!-- 테이블 상판 (두께 4cm, 상면 높이 z = 0.64m) -->
+      <geom name="table_top" type="box" pos="0.30 0 0.62" size="0.30 0.45 0.02" material="table_mat" class="prop_geom"/>
       <!-- 테이블 지지 다리 4개 -->
-      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
-      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
-      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
-      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.35" size="0.025 0.35" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg1" type="cylinder" pos="0.05  0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg2" type="cylinder" pos="0.05 -0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg3" type="cylinder" pos="0.55  0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
+      <geom name="table_leg4" type="cylinder" pos="0.55 -0.40 0.30" size="0.025 0.30" material="table_mat" class="prop_geom"/>
 
       <!-- 
         [도킹 완충 턱 (Docking Ledge)]
-        Tron1 범퍼(z ≈ 0.72m)를 완벽히 포용할 수 있도록 상하 16cm 높이의 대형 완충 턱 배치
+        Tron1 범퍼(z ≈ 0.62m)를 완벽히 포용할 수 있도록 상하 24cm 높이의 대형 완충 턱 배치
       -->
-      <geom name="table_bumper_ledge" type="box" pos="-0.05 0 0.71" size="0.03 0.25 0.08"
+      <geom name="table_bumper_ledge" type="box" pos="-0.05 0 0.61" size="0.03 0.25 0.12"
             material="ledge_mat" class="bumper_collision"/>
     </body>
 
@@ -177,10 +177,10 @@
 
       <!-- 
         [2. 상체 전면 완충 범퍼 조립체 (Front Bumper Assembly)]
-        - base_Link 전면 돌출 배치 (pos="0.17 0 -0.05")
+        - base_Link 전면 돌출 배치 (pos="0.17 0 -0.15", 10cm 하향)
         - 고마찰 완충 고무 재질 실린더 (테이블 도킹 레지와 밀착 시 3점 지지 정적 평형 확립)
       -->
-      <body name="bumper_assembly" pos="0.17 0 -0.05">
+      <body name="bumper_assembly" pos="0.17 0 -0.15">
         <geom name="front_bumper_col" type="cylinder" pos="0 0 0" euler="1.5708 0 0"
               size="0.035 0.12" material="bumper_mat" class="bumper_collision"/>
         <site name="bumper_site" pos="0.035 0 0" size="0.01" rgba="1 0 0 1"/>
@@ -208,7 +208,7 @@
 
             <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_L_Link" material="robot_dark_mat"/>
             <geom name="foot_L_col" type="sphere" pos="0.150 0 -0.2598" size="0.032" class="collision"
-                  friction="1.2 0.005 0.0001"/>
+                  friction="1.2 0.005 0.02" condim="6" solref="0.004 1" solimp="0.9 0.99 0.001 0.5 2"/>
             <site name="foot_L_site" pos="0.150 0 -0.2598" size="0.01" rgba="1 0 0 1"/>
           </body>
         </body>
@@ -236,7 +236,7 @@
 
             <geom class="visual" pos="0.150 0 -0.2598" mesh="foot_R_Link" material="robot_dark_mat"/>
             <geom name="foot_R_col" type="sphere" pos="0.150 0 -0.2598" size="0.032" class="collision"
-                  friction="1.2 0.005 0.0001"/>
+                  friction="1.2 0.005 0.02" condim="6" solref="0.004 1" solimp="0.9 0.99 0.001 0.5 2"/>
             <site name="foot_R_site" pos="0.150 0 -0.2598" size="0.01" rgba="0 0 1 1"/>
           </body>
         </body>

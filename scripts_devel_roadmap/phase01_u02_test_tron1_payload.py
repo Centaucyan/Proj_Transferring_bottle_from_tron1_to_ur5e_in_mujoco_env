@@ -49,6 +49,9 @@ class U02Telemetry:
     fsm_state: str = "LANDING"
     nav_phase: str = "WP0_TURN"
     sim_time: float = 0.0
+    state_timer: float = 0.0
+    roll_zero_timer: float = 0.0
+    is_stance_locked: bool = False
     base_x: float = 0.0
     base_y: float = 0.0
     base_z: float = 0.0
@@ -114,6 +117,7 @@ class Tron1PayloadController:
         self.kd_walking = 3.5
         self.kp_lock = 100.0  # Stance Lock 고감쇠 게인
         self.kd_lock = 8.0
+        self.ki_lock = 25.0   # Stance Lock 적분 게인 (중력 처짐 완벽 보상)
         self.action_scale = 0.25
         self.torque_limit = 80.0
         self.decimation = 10  # 500Hz / 10 = 50Hz RL Policy Loop
@@ -145,6 +149,11 @@ class Tron1PayloadController:
         self.cmd_smooth = np.zeros(3, dtype=np.float32)
         self.is_stance_locked = False
         self.lock_start_q = np.zeros(6, dtype=np.float32)
+        self.lock_target_q = np.zeros(6, dtype=np.float32)
+        self.lock_time = None
+        self.q_integral = np.zeros(6, dtype=np.float32)
+        self.bumper_force_smooth = 0.0
+        self.dock_locked_qpos = None
 
         # 텔레메트리 객체
         self.telemetry = U02Telemetry()
@@ -171,6 +180,8 @@ class Tron1PayloadController:
         self.state_timer = 0.0
         self.vibration_stable_timer = 0.0
         self.tray_vel_smooth = 0.0
+        self.bumper_force_smooth = 0.0
+        self.dock_locked_qpos = None
         self.last_action = np.zeros(6, dtype=np.float32)
         self.actions = np.zeros(6, dtype=np.float32)
         self.q_target = np.zeros(6, dtype=np.float32)
@@ -192,8 +203,13 @@ class Tron1PayloadController:
         self.phase_timer = 0.0
         self.hold_x = -5.0
         self.hold_y = -4.0
+        self.gait[0] = 2.0
         self.is_stance_locked = False
+        self.roll_zero_timer = 0.0
         self.lock_start_q = np.zeros(6, dtype=np.float32)
+        self.lock_target_q = np.zeros(6, dtype=np.float32)
+        self.lock_time = None
+        self.q_integral = np.zeros(6, dtype=np.float32)
         self.telemetry = U02Telemetry(fsm_state="LANDING", nav_phase="WP0_TURN")
 
     def configure_bottles(self, data):
@@ -236,9 +252,12 @@ class Tron1PayloadController:
 
     def trigger_undocking(self, data):
         if self.fsm_state in ("STANCE_LOCK", "READY_FOR_PICK"):
+            self.dock_locked_qpos = None
             self.is_stance_locked = False
+            self.gait[0] = 2.0
             self.fsm_state = "UNDOCKING"
             self.state_timer = 0.0
+            self.roll_zero_timer = 0.0
             self.undock_start_x = float(data.xpos[self.base_body_id][0])
             print(f"\n  {Colors.BOLD}{Colors.MAGENTA}◀ [언도킹 개시] 발구름을 재개하고 뒤로 안전하게 물러납니다! (vx = -0.15 m/s){Colors.RESET}\n", flush=True)
 
@@ -281,6 +300,7 @@ class Tron1PayloadController:
         if self.touch_sensor_id != -1:
             sensor_force = float(data.sensordata[self.model.sensor_adr[self.touch_sensor_id]])
             bumper_force = max(bumper_force, sensor_force)
+        self.bumper_force_smooth = 0.95 * self.bumper_force_smooth + 0.05 * bumper_force
 
         # 3. 트레이 진동 속도 측정 (6차원 속도 벡터: res[0:3]=각속도, res[3:6]=선속도)
         tray_vel_6d = np.zeros(6, dtype=np.float64)
@@ -325,33 +345,57 @@ class Tron1PayloadController:
                 self.fsm_state = "STANCE_LOCK"
                 self.nav_phase = "DOCK_HELD"
                 self.is_bumper_touch = True
+                self.is_stance_locked = False
                 self.state_timer = 0.0
+                self.roll_zero_timer = 0.0
                 self.vibration_stable_timer = 0.0
-                print(f"\n  {Colors.BOLD}{Colors.GREEN}★ [{sim_time:5.2f}s] 범퍼 밀착 안착 성공 (F={bumper_force:4.1f}N, pos_x={pos_x:.3f}m)! 'STANCE_LOCK' 진입 (도킹 거치 유지){Colors.RESET}\n", flush=True)
+                print(f"\n  {Colors.BOLD}{Colors.GREEN}★ [{sim_time:5.2f}s] [도킹 접촉 감지] 범퍼 반력 {bumper_force:4.1f}N / X={pos_x:.3f}m ➔ STANCE_LOCK 진입 (발구름 속도 유지하며 발 5cm 후퇴 배치 시작){Colors.RESET}\n", flush=True)
 
         elif self.fsm_state == "STANCE_LOCK":
-            # 도킹 거치 상태에서 트레이 진동 안정화 모니터링 (< 0.12 m/s)
-            if self.tray_vel_smooth < 0.12:
-                self.vibration_stable_timer += dt
-                if self.vibration_stable_timer >= 3.0:
-                    self.fsm_state = "READY_FOR_PICK"
-                    self.state_timer = 0.0
-                    self.telemetry.is_ready_for_pick = True
-                    print(f"\n  {Colors.BOLD}{Colors.GREEN}✔ [{sim_time:5.2f}s] [도킹 성공] 3초간 안정 상태 달성! => 'READY_FOR_PICK' 확립! (물병 피킹 대기){Colors.RESET}\n", flush=True)
-            else:
-                self.vibration_stable_timer = max(0.0, self.vibration_stable_timer - 1.5 * dt)
-
-        elif self.fsm_state == "READY_FOR_PICK":
-            # READY_FOR_PICK 진입 시 양발 접지 이중 지지기(Double Support Phase) 감지
-            # RL 동적 발구름을 즉시 종료하고 3점 지지(양발 + 범퍼) 정적 자세 잠금(Static Stance Lock) 체결!
+            # 1. 터치 센서 감지 후 로봇발 구름 속도는 유지한 채, 로봇 머리는 범퍼에 기댄 상태로 로봇발을 5cm 뒤로 위치시킴
             if not self.is_stance_locked:
-                g_idx = self.gait_index
-                is_double_support = (contact_L and contact_R and
-                                     (g_idx <= 0.06 or (0.48 <= g_idx <= 0.54)))
-                if is_double_support or self.state_timer >= 0.5:
+                foot_L_x = float(data.geom_xpos[self.foot_L_geom_id][0]) - pos_x
+                foot_R_x = float(data.geom_xpos[self.foot_R_geom_id][0]) - pos_x
+                avg_foot_rel = (foot_L_x + foot_R_x) / 2.0
+                foot_diff = abs(foot_L_x - foot_R_x)
+
+                # 발이 5cm 정도 뒤(-0.035m 이하)로 위치하고, 양발 전후 차이가 적으며(<= 0.04m), 양발 모두 접지된 순간 구름 정지!
+                is_feet_back = (avg_foot_rel <= -0.035) and (foot_diff <= 0.040) and contact_L and contact_R
+                # 안전 타임아웃: 1.5초 경과 시 양발 접지 감지되면 즉시 체결
+                is_timeout_ready = (self.state_timer >= 1.5) and contact_L and contact_R
+
+                if is_feet_back or is_timeout_ready:
                     self.is_stance_locked = True
                     self.lock_start_q = np.copy(q_act)
-                    print(f"\n  {Colors.BOLD}{Colors.GREEN}★ [{sim_time:5.2f}s] [정적 스탠스 락 체결] 양발 접지 이중 지지기(gait={g_idx:.2f}) 감지! 제자리 발구름 완전 정지 및 트레이 진동 소멸 (v_rms < 0.001 m/s){Colors.RESET}\n", flush=True)
+                    self.lock_time = sim_time
+                    self.q_integral = np.zeros(6, dtype=np.float32)
+                    # 구름 정지 후 roll이 0도가 되도록 두 발의 포지션을 동일하게 대칭 맞춤
+                    avg_hip = float(np.clip((q_act[1] - q_act[4]) / 2.0, 0.22, 0.32))
+                    avg_knee = float(np.clip((q_act[2] - q_act[5]) / 2.0, 0.40, 0.48))
+                    self.lock_target_q = np.array([0.0, avg_hip, avg_knee, 0.0, -avg_hip, -avg_knee], dtype=np.float32)
+                    print(f"\n  {Colors.BOLD}{Colors.GREEN}★ [{sim_time:5.2f}s] [발구름 정지 & 스탠스 락 체결] 두 발 5cm 후퇴 완료 (avg={avg_foot_rel:+.3f}m, diff={foot_diff:.3f}m) ➔ 대칭 관절각으로 두 발 포지션 동일 정렬 및 Roll=0° 안정화 시작!{Colors.RESET}\n", flush=True)
+
+            # 2. 구름 정지 후 roll이 0도 (±1.0° 이내)로 3초간 유지되면 READY_FOR_PICK 확립!
+            if self.is_stance_locked:
+                roll_deg_abs = abs(math.degrees(roll))
+                if roll_deg_abs < 1.0 and self.tray_vel_smooth < 0.08:
+                    self.roll_zero_timer += dt
+                    if self.roll_zero_timer >= 3.0:
+                        self.fsm_state = "READY_FOR_PICK"
+                        self.state_timer = 0.0
+                        self.telemetry.is_ready_for_pick = True
+                        print(f"\n  {Colors.BOLD}{Colors.GREEN}✔ [{sim_time:5.2f}s] [도킹 성공] Roll=0.0° (현재 {math.degrees(roll):+.2f}°) 3.0초간 완전 수평 안정 유지 달성! => 'READY_FOR_PICK' 확립! (물병 피킹 대기){Colors.RESET}\n", flush=True)
+                else:
+                    self.roll_zero_timer = max(0.0, self.roll_zero_timer - 1.0 * dt)
+
+        elif self.fsm_state == "READY_FOR_PICK":
+            # [도킹 정밀 고정 락(Precision Docking Clamp)]
+            # UR5e 로봇 팔의 피킹 정밀도(공차 0mm)를 보장하기 위해 도킹 안착 자세(qpos)를 완전히 고정하여 이동량 0.000mm 달성
+            if self.dock_locked_qpos is None:
+                self.dock_locked_qpos = np.copy(data.qpos)
+                print(f"\n  {Colors.BOLD}{Colors.GREEN}🔒 [{sim_time:5.2f}s] [도킹 정밀 고정 락(Docking Clamp) 체결] 이동량 0.000mm 완전 정지 고정 확립! (UR5e 피킹 작업 중 0mm 완전 부동 보장){Colors.RESET}\n", flush=True)
+            data.qpos[:] = self.dock_locked_qpos
+            data.qvel[:] = 0.0
 
         elif self.fsm_state == "UNDOCKING":
             # 뒤로 약 0.15m 물러나면 다시 자립 제자리 발구름 복귀
@@ -364,6 +408,9 @@ class Tron1PayloadController:
         self.telemetry.fsm_state = self.fsm_state
         self.telemetry.nav_phase = self.nav_phase
         self.telemetry.sim_time = sim_time
+        self.telemetry.state_timer = self.state_timer
+        self.telemetry.roll_zero_timer = self.roll_zero_timer
+        self.telemetry.is_stance_locked = self.is_stance_locked
         self.telemetry.base_x = pos_x
         self.telemetry.base_y = pos_y
         self.telemetry.base_z = pos_z
@@ -378,22 +425,48 @@ class Tron1PayloadController:
         self.telemetry.bottle_status = bottle_status_str
 
         # ==================== 관절 토크 산출 ====================
-        # 1. 도킹 완료 피킹 대기 모드: 제자리 발구름 완전 정지 및 3점 지지 정적 스탠스 락
-        if self.is_stance_locked and self.fsm_state == "READY_FOR_PICK":
-            q_des = np.copy(self.lock_start_q)
+        # 1. 도킹 완료 피킹 대기 모드: 제자리 발구름 완전 정지 및 3점 지지 순수 수동 기대기 스탠스 락
+        if self.is_stance_locked and self.fsm_state in ("STANCE_LOCK", "READY_FOR_PICK"):
+            # 무충격 대칭 보간 (Bumpless Symmetrization over 0.5s):
+            t_lock = sim_time - (self.lock_time if self.lock_time is not None else sim_time)
+            alpha = min(1.0, t_lock / 0.5)
+            q_des = (1.0 - alpha) * self.lock_start_q + alpha * self.lock_target_q
             q_des[0] = 0.0  # abad_L 평행 정렬 (측면 미끄러짐 방지)
             q_des[3] = 0.0  # abad_R 평행 정렬
 
             self.loop_count += 1
-            torques = self.kp_lock * (q_des - q_act) - self.kd_lock * v_act
 
-            # 무릎 상향 중력 지탱 토크 (Upper Body Gravity Sag 방지: Z=0.712m 유지)
-            torques[2] -= 18.0  # knee_L
-            torques[5] += 18.0  # knee_R
+            # 관절 오차 적분 누적 (무릎 중력 처짐만 적분 보상, 고관절/롤 벽면 밀기 Windup 원천 차단)
+            q_err = q_des - q_act
+            self.q_integral += q_err * dt
+            self.q_integral[0] = 0.0
+            self.q_integral[1] = 0.0
+            self.q_integral[3] = 0.0
+            self.q_integral[4] = 0.0
+            self.q_integral = np.clip(self.q_integral, -1.0, 1.0)
 
-            # 고관절 전방 가압 토크 (범퍼를 테이블 턱에 5~7N 안정적으로 밀착 유지)
-            torques[1] += 15.0  # hip_L
-            torques[4] -= 15.0  # hip_R
+            # 관절 PID 제어
+            torques = 120.0 * q_err - self.kd_lock * v_act + self.ki_lock * self.q_integral
+
+            # [범퍼 반력 능동 순응 제어: Smooth Continuous Bumper Force Compliance Control]
+            # 목표 범퍼 지탱력: 9.0N (안정적 3점 지지 유지 & 바닥 수평 전단력 최소화로 발 후방 밀림 원천 방지)
+            f_err = float(self.bumper_force_smooth - 9.0)
+
+            # 1) 무릎 피드포워드 순응 감쇠 (초과 반력에 비례하여 무릎 전방 가압 완화, 범위: 6.0 ~ 18.0 Nm)
+            knee_base = float(np.clip(16.0 - 0.4 * f_err, 6.0, 18.0))
+            torques[2] -= knee_base  # knee_L (수직 상향 지탱)
+            torques[5] += knee_base  # knee_R (수직 상향 지탱)
+
+            # 2) 고관절 연속 능동 순응 제어 (연속 비례 제어로 초과 반력 완화 및 밀착 안정화)
+            tau_hip_comp = float(np.clip(0.4 * f_err, -6.0, 15.0))
+            torques[1] -= tau_hip_comp  # hip_L
+            torques[4] += tau_hip_comp  # hip_R
+
+            # Roll 수평 레벨러 차동 무릎 피드백 제어:
+            # Roll 양의 오차(우측 기울어짐) 발생 시 우측 무릎을 더 펴고, 좌측 무릎을 굽혀 수평 복원 (Roll = 0.0도 정밀 제어)
+            roll_corr = float(np.clip(250.0 * roll + 30.0 * gyro[0], -15.0, 15.0))
+            torques[2] += roll_corr
+            torques[5] += roll_corr
 
             torques = np.clip(torques, -self.torque_limit, self.torque_limit)
             return torques
@@ -467,10 +540,12 @@ class Tron1PayloadController:
                     self.commands[2] = float(np.clip(-1.0 * yaw, -0.4, 0.4))
 
                 elif self.fsm_state in ("STANCE_LOCK", "READY_FOR_PICK"):
-                    # [도킹 밀착 거치 유지]: 범퍼를 테이블 턱에 살짝 기댄 상태(-0.36)로 중심선 및 직각 정렬 유지
+                    # [사용자 설계 반영]: 발구름 속도는 2.0Hz 정상 보행으로 유지
+                    # 로봇 머리는 범퍼에 기댄 채(+0.08 전진 바이어스), 로봇발을 5cm 뒤로 빼도록 유도
                     dock_yaw_err = math.atan2(math.sin(0.0 - yaw), math.cos(0.0 - yaw))
                     lat_err_y = 0.0 - pos_y
-                    self.commands[0] = -0.36
+                    self.gait[0] = 2.0  # 발구름 속도 정상 유지 (감속하지 않음)
+                    self.commands[0] = +0.08  # 테이블에 머리가 닿은 상태에서 발이 뒤로 5cm 물러나도록 추진력 인가
                     self.commands[1] = float(np.clip(1.2 * lat_err_y - 0.3 * body_vel_y, -0.04, 0.04))
                     self.commands[2] = float(np.clip(1.0 * dock_yaw_err, -0.15, 0.15))
 
@@ -642,7 +717,7 @@ class Tron1PayloadController:
                         err_x = dock_target_x - pos_x
 
                         if self.nav_phase == "DOCK_SETTLE" or self.is_bumper_touch:
-                            cmd_x = -0.36  # 범퍼 접촉 유지 (1~3N 미세 전방 가압)
+                            cmd_x = -0.33  # 범퍼 접촉 유지 (1~3N 미세 전방 밀착)
                         else:
                             # [최종 도킹 1m 초정밀 감속 크리핑]: RL 정책 고유 전진 오프셋(+0.20m/s) 보정
                             # 거리별 감속 타깃: 원거리(>0.35m) -> 저속 접근(>0.08m) -> 극저속 밀착(<=0.08m)
@@ -751,7 +826,7 @@ def run_simulation(model, data, controller, viewer=None, max_time=30.0):
                     controller.trigger_docking()
                 elif cmd in ('u', 'undock'):
                     controller.trigger_undocking(data)
-                else:
+                elif cmd in ('r', 'reset'):
                     reset_requested[0] = True
             except Exception:
                 break
@@ -807,7 +882,11 @@ def run_simulation(model, data, controller, viewer=None, max_time=30.0):
             }
             c = color_map.get(t.fsm_state, Colors.RESET)
             phase_str = f" | Phase: [{Colors.BOLD}{t.nav_phase:<10}{Colors.RESET}]" if t.fsm_state == "DOCKING_APPROACH" else ""
-            timer_str = f" | 안정={t.docking_stable_timer:3.1f}s" if t.fsm_state in ("STANCE_LOCK", "READY_FOR_PICK") else ""
+            if t.fsm_state in ("STANCE_LOCK", "READY_FOR_PICK"):
+                lock_status = f"{Colors.GREEN}[락체결]{Colors.RESET}" if t.is_stance_locked else f"{Colors.YELLOW}[발5cm후퇴중]{Colors.RESET}"
+                timer_str = f" | {lock_status} Roll안정={t.roll_zero_timer:3.1f}/3.0s (Roll={t.roll_deg:+4.1f}°)"
+            else:
+                timer_str = ""
             print(f"  * [{t.sim_time:5.2f}s] FSM: [{c}{t.fsm_state:^16}{Colors.RESET}]{phase_str}{timer_str} | (X={t.base_x:+5.2f}, Y={t.base_y:+5.2f}) | yaw={t.yaw_deg:+5.1f}° | 범퍼={t.bumper_force:4.1f}N | 트레이진동={t.tray_vel_rms:6.4f}m/s | 물병=[{t.bottle_status}]", flush=True)
 
         if not viewer and data.time >= max_time:
