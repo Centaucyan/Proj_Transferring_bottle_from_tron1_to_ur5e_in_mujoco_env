@@ -106,7 +106,7 @@ ROS 2 아키텍처 설계에서 가장 중요한 원칙 중 하나는 **"메시�
 | **적용 대상** | 커스텀 메시지/서비스 패키지, 고성능 C++ 노드 | Python 제어 노드, 스크립트 패키지 |
 | **빌드 도구** | CMake (`CMakeLists.txt`) | Setuptools (`setup.py`, `setup.cfg`) |
 | **코드 생성** | `rosidl`을 통해 C/C++ 헤더 및 Python 모듈 자동 컴파일 | 별도 컴파일 없음 (Python 인터프리터 구동) |
-| **본 프로젝트 적용** | **`src/tron1_interfaces`** | **`src/tron1_locomotion`**, **`src/sim_bridge`** |
+| **본 프로젝트 적용** | **`ros2_ws/src/tron1_interfaces`** | **`ros2_ws/src/tron1_locomotion`**, **`ros2_ws/src/sim_bridge`** |
 
 ---
 
@@ -186,16 +186,16 @@ flowchart TD
 
 ---
 
-### Step 1: ROS 2 워크스페이스 디렉토리 구조 준비
+### Step 1: ROS 2 워크스페이스 디렉토리 구조 준비 (`ros2_ws/src`)
 
-프로젝트 루트 디렉토리 아래에 표준 ROS 2 소스 디렉토리(`src/`)를 생성합니다.
+프로젝트 루트 디렉토리 아래에 전용 ROS 2 워크스페이스(`ros2_ws/`) 및 소스 디렉토리(`ros2_ws/src/`)를 생성합니다.
 
 ```bash
-# 터미널 실행
-cd /media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
+# 터미널 실행 (프로젝트 루트 디렉토리 이동)
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
 
-# src 디렉토리 생성
-mkdir -p src
+# 전용 ros2_ws 및 src 디렉토리 생성
+mkdir -p ros2_ws/src
 ```
 
 ---
@@ -203,28 +203,28 @@ mkdir -p src
 ### Step 2: 인터페이스 패키지 (`tron1_interfaces`) 생성 및 메시지 작성
 
 #### 2.1. 패키지 뼈대 생성 (`ament_cmake`)
-Conda 가상환경과 ROS 2 환경을 활성화한 후 패키지를 생성합니다:
+Conda 가상환경과 ROS 2 환경을 활성화한 후 `ros2_ws/src` 디렉토리로 이동하여 패키지를 생성합니다:
 
 ```bash
 # 1. 환경 활성화
 conda activate transfer_bottle_by_tron1_py3_10
 source /opt/ros/humble/setup.bash
 
-# 2. 인터페이스 패키지 생성
-cd src
+# 2. 인터페이스 패키지 생성 (ros2_ws/src 디렉토리 이동)
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws/src
 ros2 pkg create --build-type ament_cmake tron1_interfaces \
   --description "Custom ROS 2 interfaces for Tron1 quadruped/biped robot" \
   --license Apache-2.0
 ```
 
 #### 2.2. 메시지 정의 파일 생성 (`msg/Tron1Status.msg`)
-`src/tron1_interfaces/msg` 디렉토리를 만들고 메시지 파일을 작성합니다:
+`ros2_ws/src/tron1_interfaces/msg` 디렉토리를 만들고 메시지 파일을 작성합니다:
 
 ```bash
 mkdir -p tron1_interfaces/msg
 ```
 
-`src/tron1_interfaces/msg/Tron1Status.msg` 파일을 생성하고 아래 내용을 입력합니다:
+`ros2_ws/src/tron1_interfaces/msg/Tron1Status.msg` 파일을 생성하고 아래 내용을 입력합니다:
 
 ```protobuf
 # [Tron1Status.msg] Tron1 로봇 상태 및 도킹 인터락 모니터링 메시지
@@ -257,7 +257,7 @@ float32 base_yaw_deg
 ```
 
 #### 2.3. `package.xml` 수정
-`src/tron1_interfaces/package.xml` 파일을 열어 `rosidl` 관련 의존성을 등록합니다:
+`ros2_ws/src/tron1_interfaces/package.xml` 파일을 열어 `rosidl` 관련 의존성을 등록합니다:
 
 ```xml
 <?xml version="1.0"?>
@@ -286,7 +286,7 @@ float32 base_yaw_deg
 ```
 
 #### 2.4. `CMakeLists.txt` 수정
-`src/tron1_interfaces/CMakeLists.txt` 파일을 열어 메시지 빌드 지시어를 추가합니다:
+`ros2_ws/src/tron1_interfaces/CMakeLists.txt` 파일을 열어 메시지 빌드 지시어를 추가합니다:
 
 ```cmake
 cmake_minimum_required(VERSION 3.8)
@@ -313,17 +313,17 @@ ament_package()
 
 ### Step 3: 인터페이스 패키지 빌드 및 메시지 검증
 
-프로젝트 루트 디렉토리로 이동하여 `colcon build`를 수행합니다:
+ROS 2 워크스페이스 디렉토리(`ros2_ws/`)로 이동하여 `colcon build`를 수행합니다:
 
 ```bash
-cd /media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws
 
 # 인터페이스 패키지만 선택 빌드
 colcon build --packages-select tron1_interfaces
 ```
 
 > [!NOTE]
-> 빌드가 성공하면 `install/` 디렉토리에 C++ 헤더뿐만 아니라 Python 모듈(`install/tron1_interfaces/local/lib/python3.10/dist-packages/tron1_interfaces`)이 함께 생성됩니다.
+> 빌드가 성공하면 `ros2_ws/install/` 디렉토리에 C++ 헤더뿐만 아니라 Python 모듈(`ros2_ws/install/tron1_interfaces/local/lib/python3.10/dist-packages/tron1_interfaces`)이 함께 생성됩니다.
 
 빌드 완료 후 환경을 반영하고 메시지가 정상 인식되는지 확인합니다:
 
@@ -356,7 +356,7 @@ float32 base_yaw_deg
 
 #### 4.1. 패키지 뼈대 생성 (`ament_python`)
 ```bash
-cd /media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/src
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/src
 
 ros2 pkg create --build-type ament_python tron1_locomotion \
   --dependencies rclpy std_msgs sensor_msgs geometry_msgs tron1_interfaces \
@@ -371,7 +371,7 @@ mkdir -p config
 ```
 
 #### 4.2. `package.xml` 설정 확인
-`src/tron1_locomotion/package.xml`에 필요한 의존성이 올바르게 명시되었는지 점검합니다:
+`ros2_ws/src/tron1_locomotion/package.xml`에 필요한 의존성이 올바르게 명시되었는지 점검합니다:
 
 ```xml
 <?xml version="1.0"?>
@@ -396,7 +396,7 @@ mkdir -p config
 ```
 
 #### 4.3. `setup.py` 설정 및 실행 진입점(Entry Point) 등록
-`src/tron1_locomotion/setup.py` 파일을 열어 실행 파일 진입점과 설정 파일 설치 경로를 등록합니다:
+`ros2_ws/src/tron1_locomotion/setup.py` 파일을 열어 실행 파일 진입점과 설정 파일 설치 경로를 등록합니다:
 
 ```python
 import os
@@ -434,7 +434,7 @@ setup(
 ### Step 5: 파라미터 설정 파일 (`config/tron1_params.yaml`) 작성
 
 로봇의 스폰 위치, 경유지 리스트, 보행 및 도킹 파라미터를 YAML로 분리합니다.
-`src/tron1_locomotion/config/tron1_params.yaml` 파일을 생성하고 아래와 같이 작성합니다:
+`ros2_ws/src/tron1_locomotion/config/tron1_params.yaml` 파일을 생성하고 아래와 같이 작성합니다:
 
 ```yaml
 tron1_controller:
@@ -474,7 +474,7 @@ tron1_controller:
 
 ### Step 6: Tron1 FSM 제어기 노드 (`tron1_controller.py`) 구현
 
-이제 `src/tron1_locomotion/tron1_locomotion/tron1_controller.py`를 작성합니다.
+이제 `ros2_ws/src/tron1_locomotion/tron1_locomotion/tron1_controller.py`를 작성합니다.
 이 코드는 Phase 01-U02의 복잡한 물리 로직을 ROS 2 노드로 완벽히 추상화한 형태입니다:
 
 ```python
@@ -717,10 +717,10 @@ if __name__ == '__main__':
 ### Step 7: 제어기 패키지 빌드 및 독립 노드 구동 테스트
 
 #### 7.1. 패키지 빌드
-워크스페이스 루트로 이동하여 두 패키지를 함께 빌드합니다:
+ROS 2 워크스페이스 루트(`ros2_ws/`)로 이동하여 두 패키지를 함께 빌드합니다:
 
 ```bash
-cd /media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws
 
 colcon build --packages-select tron1_interfaces tron1_locomotion
 source install/setup.bash
@@ -748,7 +748,8 @@ ros2 run tron1_locomotion tron1_controller
 ```bash
 conda activate transfer_bottle_by_tron1_py3_10
 source /opt/ros/humble/setup.bash
-source /media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/install/setup.bash
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws
+source install/setup.bash
 
 # 토픽 실시간 에코
 ros2 topic echo /tron1/status
@@ -806,6 +807,7 @@ ros2 topic pub --once /tron1/cmd_undock std_msgs/msg/Bool "{data: true}"
 * **원인:** 노드를 실행할 때 `--ros-args --params-file` 옵션을 명시하지 않고 `ros2 run`만 실행했기 때문입니다.
 * **조치법:**
   ```bash
+  cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws
   ros2 run tron1_locomotion tron1_controller --ros-args --params-file src/tron1_locomotion/config/tron1_params.yaml
   ```
 

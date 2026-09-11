@@ -179,7 +179,7 @@ stateDiagram-v2
 
 ## 5. 결론 및 ROS 2 패키지화 연계 지침
 
-본 규격서에 정의된 **6대 FSM 상태 구조**는 향후 진행될 **Phase 02 (`src/tron1_locomotion/tron1_controller.py`)** 노드 개발 시 클래스 열거형(Enum) 및 콜백 구조의 표준 기준이 됩니다:
+본 규격서에 정의된 **6대 FSM 상태 구조**는 향후 진행될 **Phase 02 (`ros2_ws/src/tron1_locomotion/tron1_controller.py`)** 노드 개발 시 클래스 열거형(Enum) 및 콜백 구조의 표준 기준이 됩니다:
 
 ```python
 from enum import Enum

@@ -24,7 +24,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **Simulator** | **MuJoCo** | **3.x (3.2.x 이상)** | 고속 물리 시뮬레이션 엔진 (Tron1 보행 동역학 및 UR5e/그리퍼 접촉 역학) | `pip install mujoco` |
 | **Viewer** | mujoco-python-viewer | 최신 버전 | Python에서 MuJoCo 대화형 3D 시각화 GUI 제공 | `pip install mujoco-python-viewer` |
-| **통신 아키텍처** | **Python Bridge** *(권장)* | 커스텀 노드 | `rclpy`와 `mujoco`를 직접 결합한 비동기 통신 브리지 (`src/sim_bridge/mujoco_ros_bridge.py`). C++ CMAKE 빌드 충돌 없이 안정적 구동 | Phase 03에서 직접 구현 |
+| **통신 아키텍처** | **Python Bridge** *(권장)* | 커스텀 노드 | `rclpy`와 `mujoco`를 직접 결합한 비동기 통신 브리지 (`ros2_ws/src/sim_bridge/mujoco_ros_bridge.py`). C++ CMAKE 빌드 충돌 없이 안정적 구동 | Phase 03에서 직접 구현 |
 
 > **참고 (C++ mujoco_ros2_control 배제 사유):**  
 > `mujoco_ros2_control`은 C++ 기반의 빌드 플러그인으로 Conda 가상환경과 결합 시 심각한 ABI 충돌(컴파일 에러)을 유발하기 쉽습니다. 본 프로젝트는 학습 및 안정성을 위해 **순수 Python 브리지(`rclpy + mujoco`)**를 메인 아키텍처로 사용합니다.
