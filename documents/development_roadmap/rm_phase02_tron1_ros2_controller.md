@@ -371,6 +371,9 @@ colcon build --packages-select tron1_interfaces
 
 > [!NOTE]
 > 빌드가 성공하면 `ros2_ws/install/` 디렉토리에 C++ 헤더뿐만 아니라 Python 모듈(`ros2_ws/install/tron1_interfaces/local/lib/python3.10/dist-packages/tron1_interfaces`)이 함께 생성됩니다.
+> 
+> **💡 [참고] CMake 경고(`Cannot generate a safe runtime search path... libpython3.10.so may be hidden`) 발생 시:**  
+> 빌드 도중 `libpython3.10.so.1.0 in /usr/lib/... may be hidden by files in .../miniconda3/envs/.../lib` 경고가 출력될 수 있습니다. 이는 `conda activate`로 인해 가상환경 경로가 `$PATH` 및 탐색 경로 최우선순위를 가지면서 시스템 파이썬이 가려진다는 CMake의 단순 안내성 경고(Warning)이며, **Conda 가상환경의 격리된 파이썬 라이브러리가 의도한 대로 정상 동작하고 있다는 의미**이므로 안심하고 무시하셔도 됩니다 (`Finished`로 끝나면 100% 정상).
 
 빌드 완료 후 환경을 반영하고 메시지가 정상 인식되는지 확인합니다:
 
@@ -880,14 +883,20 @@ ros2 topic pub --once /tron1/cmd_undock std_msgs/msg/Bool "{data: true}"
   ros2 run tron1_locomotion tron1_controller --ros-args --params-file src/tron1_locomotion/config/tron1_params.yaml
   ```
 
-### Q4. `colcon build` 시 `ModuleNotFoundError: No module named 'em'` 에러가 발생합니다.
-* **원인:** Conda 가상환경 내에 ROS 2 인터페이스 코드 변환용 파이썬 템플릿 엔진인 `empy`가 설치되어 있지 않기 때문입니다.
+### Q4. `colcon build` 시 `No module named 'em'` 또는 `No module named 'catkin_pkg'` 에러가 발생합니다.
+* **원인:** Conda 가상환경 내에 ROS 2 인터페이스 코드 변환 및 `package.xml` 메타데이터 파싱용 파이썬 도구(`empy`, `catkin_pkg`, `lark`)가 설치되어 있지 않기 때문입니다.
 * **조치법:**
-  ROS 2 Humble 호환을 위해 반드시 **3.x 버전(`empy==3.3.4`)**으로 설치해야 합니다 (최신 4.x 설치 시 API 불일치 오류 발생):
+  ROS 2 Humble 호환을 위해 반드시 **3.x 버전(`empy==3.3.4`)** 및 필수 빌드 도구들을 함께 설치합니다 (최신 empy 4.x 설치 시 API 불일치 오류 발생):
   ```bash
   conda activate transfer_bottle_by_tron1_py3_10
-  pip install "empy==3.3.4" lark
+  pip install "empy==3.3.4" lark catkin_pkg
   ```
+
+### Q5. `colcon build` 시 `Cannot generate a safe runtime search path ... libpython3.10.so may be hidden` 경고가 발생합니다.
+* **원인:** `conda activate` 명령을 실행하면 가상환경 디렉토리(`.../miniconda3/envs/.../bin`, `lib`)가 시스템 `$PATH` 및 라이브러리 검색 경로의 최우선 순위로 배치됩니다. CMake가 C/Python 바인딩 라이브러리를 링크할 때 Conda의 `libpython3.10.so`를 1순위로 탐색하면서, 시스템 기본 경로(`/usr/lib/x86_64-linux-gnu`)의 파이썬 라이브러리가 가려질 수 있다고 알리는 단순 주의성 경고(Warning)입니다.
+* **영향 및 조치:**
+  * **빌드는 성공(`Finished <<< tron1_interfaces`)한 상태**이며 컴파일 에러가 아닙니다.
+  * 우리가 의도한 대로 시스템 파이썬이 아닌 Conda 가상환경의 파이썬 런타임이 정확히 우선 바인딩되고 있다는 정상적인 증거이므로, 별도의 조치 없이 안심하고 넘어가시면 됩니다.
 
 ---
 

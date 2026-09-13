@@ -176,7 +176,7 @@ source /opt/ros/humble/setup.bash
 ### 6.4. Conda 가상환경 내 Python 핵심 라이브러리 설치
 ```bash
 python -m pip install --upgrade pip
-python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime "empy==3.3.4" lark
+python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime "empy==3.3.4" lark catkin_pkg
 ```
 
 #### 💡 Python 핵심 패키지(pip) 상세 역할 및 기능 요약
@@ -197,6 +197,7 @@ python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy sci
 | **`onnxruntime`** | 기계학습 추론 | LimX Dynamics 공식 사전 훈련 강화학습 정책(policy.onnx, encoder.onnx)을 CPU에서 500Hz로 실시간 추론하여 Tron1 제자리 발구름 및 균형 제어 |
 | **`empy==3.3.4`** | 코드 생성기 | ROS 2 커스텀 인터페이스(`.msg`, `.srv`) 빌드 시 C++/Python 코드를 생성하는 템플릿 엔진 (`rosidl_adapter` 필수 의존성, 3.x 버전 고정) |
 | **`lark`** | 구문 분석 | ROS 2 IDL 인터페이스 정의 파서 및 문법 분석 엔진 |
+| **`catkin_pkg`** | 패키지 관리 | ROS 2 빌드 시스템(`ament_cmake`)에서 `package.xml` 메타데이터 및 의존성을 파싱하는 도구 |
 
 > **[중요] `empy` 패키지 버전 고정(`==3.3.4` 또는 `<4`)의 필요성 및 배경:**
 > 
@@ -213,7 +214,7 @@ python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy sci
 ### 6.5. 정상 연동 검증
 가상환경 활성화 및 ROS 2 소싱 상태에서 아래 명령어로 주요 패키지의 정상 임포트 여부를 1차 확인합니다:
 ```bash
-python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; import em; import lark; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
+python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; import em; import lark; import catkin_pkg; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
 ```
 *(보다 심층적인 CXXABI 심볼 진단 및 오프스크린 렌더링 검사는 Phase 00의 `scripts_devel_roadmap/phase00_check_env.py`를 통해 진행합니다.)*
 
