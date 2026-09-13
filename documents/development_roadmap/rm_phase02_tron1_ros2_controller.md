@@ -17,17 +17,25 @@
 2. [핵심 이론 및 아키텍처 설계](#2-핵심-이론-및-아키텍처-설계)
    * [2.1. 인터페이스 분리 원칙 (SoC: Separation of Concerns)](#21-인터페이스-분리-원칙-soc-separation-of-concerns)
    * [2.2. ament_cmake vs ament_python 빌드 시스템의 차이](#22-ament_cmake-vs-ament_python-빌드-시스템의-차이)
-   * [2.3. 하드코딩 제거: ROS 2 Parameter와 YAML 설정 원리](#23-하드코딩-제거-ros-2-parameter와-yaml-설정-원리)
+   * [2.3. 파라미터 분리 및 도킹 하드웨어 불변 상수화 (Safety Invariants)](#23-파라미터-분리-및-도킹-하드웨어-불변-상수화-safety-invariants)
    * [2.4. MuJoCo Site 기반 순방향 기구학(FK) 물병 자동 배치 메커니즘](#24-mujoco-site-기반-순방향-기구학fk-물병-자동-배치-메커니즘)
    * [2.5. 유한 상태 머신(FSM)의 비동기 ROS 2 노드 이벤트 루프 변환](#25-유한-상태-머신fsm의-비동기-ros-2-노드-이벤트-루프-변환)
 3. [단계별 실습 (Step-by-Step Hands-on Guide)](#3-단계별-실습-step-by-step-hands-on-guide)
    * [Step 1: ROS 2 워크스페이스 디렉토리 구조 준비](#step-1-ros-2-워크스페이스-디렉토리-구조-준비)
    * [Step 2: 인터페이스 패키지 (`tron1_interfaces`) 생성 및 메시지 작성](#step-2-인터페이스-패키지-tron1_interfaces-생성-및-메시지-작성)
    * [Step 3: 인터페이스 패키지 빌드 및 메시지 검증](#step-3-인터페이스-패키지-빌드-및-메시지-검증)
-   * [Step 4: 제어기 패키지 (`tron1_locomotion`) 생성 및 패키징 설정](#step-4-제어기-패키지-tron1_locomotion-생성-및-패키징-설정)
+   * [Step 4: 제어기 패키지 (`tron1_locomotion`) 뼈대 생성 및 의존성 확인](#step-4-제어기-패키지-tron1_locomotion-뼈대-생성-및-의존성-확인)
    * [Step 5: 파라미터 설정 파일 (`config/tron1_params.yaml`) 작성](#step-5-파라미터-설정-파일-configtron1_paramsyaml-작성)
    * [Step 6: Tron1 FSM 제어기 노드 (`tron1_controller.py`) 구현](#step-6-tron1-fsm-제어기-노드-tron1_controllerpy-구현)
-   * [Step 7: 제어기 패키지 빌드 및 독립 노드 구동 테스트](#step-7-제어기-패키지-빌드-및-독립-노드-구동-테스트)
+     * [6.1. FSM 상태 전이 원리 및 Phase 02 가상 타이머(Mock Timer) 구조](#61-fsm-상태-전이-원리-및-phase-02-단독-테스트용-가상-타이머mock-timer-구조)
+     * [6.2. `tron1_controller.py` 소스 코드 작성](#62-tron1_controllerpy-소스-코드-작성)
+   * [Step 7: 패키징 설정 (`setup.py` - YAML 설치 및 실행 진입점 등록)](#step-7-패키징-설정-setuppy---yaml-설치-및-실행-진입점-등록)
+   * [Step 8: 제어기 패키지 빌드 및 독립 노드 구동 테스트](#step-8-제어기-패키지-빌드-및-독립-노드-구동-테스트)
+     * [8.1. 패키지 빌드](#81-패키지-빌드)
+     * [8.2. 단독 노드 실행 및 토픽 검증 (Terminal 1)](#82-단독-노드-실행-및-토픽-검증-terminal-1)
+     * [8.3. 토픽 발행 및 인터락 에코 테스트 (Terminal 2)](#83-토픽-발행-및-인터락-에코-테스트-terminal-2)
+     * [8.4. 가상 범퍼 접촉 신호 발행 및 도킹 안착 테스트 (Terminal 3)](#84-가상-범퍼-접촉-신호-발행-및-도킹-안착-테스트-terminal-3)
+     * [8.5. 언도킹 신호 수신 원격 테스트 (Terminal 3)](#85-언도킹-신호-수신-원격-테스트-terminal-3)
 4. [트러블슈팅 및 디버깅 팁](#4-트러블슈팅-및-디버깅-팁)
 5. [Phase 02 완성 체크리스트](#5-phase-02-완성-체크리스트)
 
@@ -58,7 +66,7 @@ Phase 01-U02 단계에서 우리는 `scripts_devel_roadmap/phase01_u02_test_tron
 %%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '13px' }}}%%
 flowchart LR
     subgraph Config ["설정 계층"]
-        YAML["tron1_params.yaml<br/>• spawn_pose<br/>• num_bottles<br/>• waypoints"]
+        YAML["tron1_params.yaml<br/>• spawn_pose<br/>• nav_waypoints<br/>• bottle_slots"]
     end
 
     subgraph PkgInterfaces ["tron1_interfaces (ament_cmake)"]
@@ -110,19 +118,18 @@ ROS 2 아키텍처 설계에서 가장 중요한 원칙 중 하나는 **"메시�
 
 ---
 
-### 2.3. 하드코딩 제거: ROS 2 Parameter와 YAML 설정 원리
+### 2.3. 파라미터 분리 및 도킹 하드웨어 불변 상수화 (Safety Invariants)
 
-기존 코드에서는 로봇의 초기 스폰 위치와 주행 경유지가 Python 소스 코드 내에 하드코딩되어 있었습니다:
+* **가변적인 일반 주행 경로 (`nav_waypoints`)**:
+  * 로봇이 어디서 출발하는지, 작업장 장애물을 어떻게 우회할지는 환경에 따라 달라지는 가변 조건이므로 **YAML 파라미터(`nav_waypoints`)**로 분리하여 코드 재빌드 없이 유연하게 설정합니다.
+* **도킹 스테이션 하드웨어 결합 불변 상수 (`DOCK_ALIGN_POSE`, `DOCK_TARGET_POSE`)**:
+  * 반면, 도킹 진입 1m 전 정렬 지점(`[-1.0, 0.0]`)과 최종 범퍼 밀착 접촉 지점(`[0.0, 0.0]`)은 도킹 스테이션 하드웨어 규격과 1:1로 종속된 **물리적 불변값(Hardware Invariants)**입니다.
+  * 만약 이를 외부 파라미터로 열어두면 오입력 시 도킹 실패 및 심각한 전복 충돌이 발생하므로, 제어기 Python 코드 내부의 **불변 상수(Constant)**로 영구 고정하여 안전성(Safety)을 원천 확보합니다:
 ```python
-# 기존 하드코딩 방식 (지양)
-self.waypoints = [(-3.0, 3.0), (-0.70, 0.0), (0.27, 0.0)]
-self.hold_x = -5.0
-self.hold_y = -4.0
+# [Python 노드 내부 하드웨어 안전 불변 상수]
+DOCK_ALIGN_POSE = (-1.0, 0.0)    # 도킹 진입 1m 전 헤딩 정렬 지점 (TABLE_ALIGN)
+DOCK_TARGET_POSE = (0.0, 0.0)   # 최종 범퍼 밀착 및 도킹 락 목표점 (DOCKING_APPROACH)
 ```
-
-ROS 2에서는 노드가 실행될 때 외부 YAML 파일로부터 파라미터를 동적으로 주입받습니다:
-* 노드 내부에서는 파라미터 이름과 기본값(Default value)을 선언(`declare_parameter`)합니다.
-* 실행 시점(Launch 또는 CLI)에서 사용자가 YAML 파일 경로를 지정하면, 소스 코드를 단 한 줄도 수정하거나 재빌드(`colcon build`)할 필요 없이 동작 조건을 변경할 수 있습니다.
 
 ---
 
@@ -402,11 +409,12 @@ float32 base_yaw_deg
 
 ---
 
-### Step 4: 제어기 패키지 (`tron1_locomotion`) 생성 및 패키징 설정
+### Step 4: 제어기 패키지 (`tron1_locomotion`) 뼈대 생성 및 의존성 확인
 
 #### 4.1. 패키지 뼈대 생성 (`ament_python`)
 ```bash
-cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/src
+# ros2_ws/src 디렉토리로 이동
+cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws/src
 
 ros2 pkg create --build-type ament_python tron1_locomotion \
   --dependencies rclpy std_msgs sensor_msgs geometry_msgs tron1_interfaces \
@@ -414,11 +422,15 @@ ros2 pkg create --build-type ament_python tron1_locomotion \
   --license Apache-2.0
 ```
 
-디렉토리 구조를 확인하고 설정 파일(`config/`) 및 노드 디렉토리를 정리합니다:
+디렉토리 구조를 확인하고, 다음 단계에서 작성할 YAML 파라미터 파일들을 보관할 설정 디렉토리(`config/`)를 미리 생성합니다:
 ```bash
 cd tron1_locomotion
 mkdir -p config
 ```
+
+> [!NOTE]
+> **자동 생성된 `resource/` 및 `test/` 디렉토리의 역할:**  
+> `ament_python` 패키지 생성 시 함께 만들어지는 `resource/` (Ament Index 패키지 색인 마커) 및 `test/` (PEP 8/257 린터 및 단위 테스트) 폴더의 내부 원리와 삭제 금지 주의사항은 [`Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/documents/study/phase02_study_ament_python_resource_and_test_folders.md`](../study/phase02_study_ament_python_resource_and_test_folders.md) 문서를 참고하십시오.
 
 #### 4.2. `package.xml` 설정 확인
 `ros2_ws/src/tron1_locomotion/package.xml`에 필요한 의존성이 올바르게 명시되었는지 점검합니다:
@@ -445,39 +457,7 @@ mkdir -p config
 </package>
 ```
 
-#### 4.3. `setup.py` 설정 및 실행 진입점(Entry Point) 등록
-`ros2_ws/src/tron1_locomotion/setup.py` 파일을 열어 실행 파일 진입점과 설정 파일 설치 경로를 등록합니다:
-
-```python
-import os
-from glob import glob
-from setuptools import find_packages, setup
-
-package_name = 'tron1_locomotion'
-
-setup(
-    name=package_name,
-    version='1.0.0',
-    packages=find_packages(exclude=['test']),
-    data_files=[
-        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
-        # YAML 설정 파일 설치 등록
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
-    ],
-    install_requires=['setuptools'],
-    zip_safe=True,
-    maintainer='korit',
-    maintainer_email='korit@todo.todo',
-    description='ROS 2 FSM Locomotion and Docking Controller Node for Tron1',
-    license='Apache-2.0',
-    entry_points={
-        'console_scripts': [
-            'tron1_controller = tron1_locomotion.tron1_controller:main',
-        ],
-    },
-)
-```
+> 💡 **참고:** `setup.py` 설정은 먼저 필요한 파일들(**Step 5의 파라미터 YAML 파일**과 **Step 6의 제어기 노드 소스코드**)을 모두 작성한 후, 이를 종합하여 등록하는 **Step 7**에서 진행합니다.
 
 ---
 
@@ -490,27 +470,29 @@ setup(
 tron1_controller:
   ros__parameters:
     # 1. Tron1 초기 스폰 포즈 [X (m), Y (m), Z (m), Yaw (deg)]
-    spawn_pose: [-5.0, -4.0, 0.80, 0.0]
+    spawn_pose: [-2.0, -2.0, 0.80, 90.0]
 
-    # 2. 트레이 슬롯별 물병 적재 마스크 [Slot 1 (좌), Slot 2 (중앙), Slot 3 (우)]
+    # 2. 일반 자율 주행 경유지 리스트 [X1, Y1, X2, Y2, ...]
+    # ※ 장애물 우회나 경로 변경이 필요할 때 자유롭게 (X, Y) 좌표 쌍을 추가/삭제할 수 있습니다.
+    # • 경유지 1개 예시: [-4.0, 3.0]
+    # • 경유지 2개 예시: [-4.0, 0.0, -4.0, 3.0] (순서대로 추종)
+    # • 경유지 0개 예시: [] (장애물 없이 도킹 정렬 지점으로 직행)
+    # ※ 리스트의 모든 경유지를 통과(WALKING)하면 제어기가 자동으로 고정 도킹 시퀀스(DOCKING_APPROACH)로 진입합니다.
+    #    (도킹 정렬 지점 [-1.0, 0.0] 및 안착 목표점 [0.0, 0.0]은 하드웨어 안전을 위해 파이썬 코드 상수로 고정됨)
+    nav_waypoints: [-4.0, 3.0]
+
+    # 3. 트레이 슬롯별 물병 적재 마스크 [Slot 1 (좌), Slot 2 (중앙), Slot 3 (우)]
     # • [true, true, true]: 물병 3개 만재
     # • [true, false, true]: 1번, 3번만 적재 (가운데 비움)
     # • [true, false, false]: 1번(좌측)만 적재 (비대칭 하중)
     # • [false, false, false]: 물병 없음 (빈 트레이 주행 및 도킹 테스트)
     bottle_slots: [true, true, true]
 
-    # 3. 자율 주행 경유지 리스트 (2D 평면 좌표 X, Y)
-    # WP1: 코너 우회 지점, WP2: 테이블 1m 전 정렬 지점, WP3: 범퍼 접촉 목표점
-    waypoints:
-      - [-3.0, 3.0]
-      - [-0.70, 0.0]
-      - [0.27, 0.0]
-
     # 4. 주행 및 내비게이션 제어 게인
     nav_linear_kp: 0.6          # 경유지 접근 선속도 비례 게인
     nav_max_speed: 0.65         # 최대 직진 속도 (m/s)
     nav_reach_dist: 0.35        # 경유지 도달 판정 반경 (m)
-    docking_creep_speed: 0.15   # WP2 이후 최종 도킹 시 저속 크리핑 속도 (m/s)
+    docking_creep_speed: 0.15   # DOCKING_APPROACH 진입 후 범퍼 접촉을 위한 저속 크리핑 속도 (m/s)
 
     # 5. 도킹 및 수평 인터락 판정 임계값
     bumper_threshold_n: 5.0     # 범퍼 터치 접촉 감지 최소 반력 (N)
@@ -524,6 +506,26 @@ tron1_controller:
 
 ### Step 6: Tron1 FSM 제어기 노드 (`tron1_controller.py`) 구현
 
+#### 6.1. FSM 상태 전이 원리 및 Phase 02 단독 테스트용 가상 타이머(Mock Timer) 구조
+Phase 02에서는 **MuJoCo 시뮬레이터(`sim_bridge`) 없이도 제어 노드가 단독으로 FSM 상태 천이와 ROS 2 토픽 발행을 정상 수행하는지 자체 검증**해야 합니다.  
+따라서 50Hz 제어 루프(`control_loop`) 내부에 `state_timer` 기반의 가상 타이머가 내장되어 있습니다:
+
+* **0.0초 (실행 직후)**: `LANDING` (공중 스폰 착지 대기)
+* **2.0초 경과**: `>> FSM: LANDING -> IN_PLACE_HOLD` (착지 충격 흡수 모사 및 제자리 발구름 대기)
+* **4.0초 경과**: `>> FSM: IN_PLACE_HOLD -> WALKING` (경유지 자율 보행 개시)
+* **8.0초 경과**: `>> FSM: WALKING -> DOCKING_APPROACH` (경유지 도달 완료 모사 및 도킹 접근 개시)
+* **`DOCKING_APPROACH` 이후 대기**: 실제 테이블 범퍼 접촉 반력(`bumper_force >= 5.0N`)이 감지되어야만 `STANCE_LOCK`으로 넘어가므로, 물리 시뮬레이터 연동 전까지 안전하게 이 상태에서 대기합니다.
+
+| 상태 전이 | Phase 02 (단독 테스트) | Phase 03~04 (MuJoCo 연동 시 실제 물리 판정) |
+| :--- | :---: | :--- |
+| **`LANDING` $\rightarrow$ `IN_PLACE_HOLD`** | 2초 경과 | MuJoCo 양발 지면 접촉 센서 감지 + 착지 충격 감쇠 |
+| **`IN_PLACE_HOLD` $\rightarrow$ `WALKING`** | 2초 경과 | 물병 하중 적응 1초 안정 유지 후 주행 트리거 |
+| **`WALKING` $\rightarrow$ `DOCKING_APPROACH`** | 4초 경과 | 오도메트리 위치 $(X, Y)$가 `nav_waypoints` 최종 경유지 반경 $0.35\,\text{m}$ 도달 완료 |
+| **`DOCKING_APPROACH` $\rightarrow$ `STANCE_LOCK`** | 범퍼 $\ge 5.0\,\text{N}$ | 고정 정렬 지점 `(-1.0, 0.0)` 정렬 후 안착점 `(0.0, 0.0)` 전진 중 **MuJoCo 범퍼 반력 센서 $\ge 5.0\,\text{N}$ 접촉 감지** |
+
+---
+
+#### 6.2. `tron1_controller.py` 소스 코드 작성
 이제 `ros2_ws/src/tron1_locomotion/tron1_locomotion/tron1_controller.py`를 작성합니다.
 이 코드는 Phase 01-U02의 복잡한 물리 로직을 ROS 2 노드로 완벽히 추상화한 형태입니다:
 
@@ -534,7 +536,7 @@ tron1_controller:
 [tron1_controller.py] Tron1 FSM Locomotion and Docking Controller Node
 - 50Hz 제어 루프: LimX RL 정책 추론 및 FSM 상태 천이
 - 10Hz 상태 퍼블리셔: /tron1/status (Tron1Status.msg)
-- 파라미터 동적 로드: spawn_pose, waypoints, num_bottles
+- 파라미터 동적 로드: spawn_pose, nav_waypoints, bottle_slots
 - 언도킹 구독: /tron1/cmd_undock
 """
 
@@ -548,6 +550,13 @@ from sensor_msgs.msg import JointState, Imu
 from geometry_msgs.msg import WrenchStamped
 from tron1_interfaces.msg import Tron1Status
 
+# =====================================================================
+# 도킹 스테이션 하드웨어 안전 불변 상수 (Station Hardware Invariants)
+# ※ 안전 필수: 도킹 턱 물리 위치 및 로봇 범퍼 오프셋과 1:1 결합된 불변값
+# =====================================================================
+DOCK_ALIGN_POSE = (-1.0, 0.0)    # 도킹 진입 1m 전 헤딩 정렬 지점 (TABLE_ALIGN)
+DOCK_TARGET_POSE = (0.0, 0.0)   # 최종 범퍼 밀착 및 도킹 락 목표점 (DOCKING_APPROACH)
+
 class Tron1ControllerNode(Node):
     def __init__(self):
         super().__init__('tron1_controller')
@@ -556,19 +565,19 @@ class Tron1ControllerNode(Node):
         # -------------------------------------------------------------
         # 1. ROS 2 파라미터 선언 및 로드
         # -------------------------------------------------------------
-        self.declare_parameter('spawn_pose', [-5.0, -4.0, 0.80, 0.0])
+        self.declare_parameter('spawn_pose', [-2.0, -2.0, 0.80, 90.0])
+        self.declare_parameter('nav_waypoints', [-4.0, 3.0])
         self.declare_parameter('bottle_slots', [True, True, True])
-        self.declare_parameter('waypoints', [-3.0, 3.0, -0.70, 0.0, 0.27, 0.0])
         self.declare_parameter('nav_max_speed', 0.65)
         self.declare_parameter('docking_creep_speed', 0.15)
         self.declare_parameter('bumper_threshold_n', 5.0)
         self.declare_parameter('vibration_hold_time_s', 3.0)
 
         self.spawn_pose = self.get_parameter('spawn_pose').value
+        raw_wps = self.get_parameter('nav_waypoints').value
+        # 1차원 배열로 들어온 nav_waypoints를 2D 튜플 리스트로 변환 (예: [-4.0, 3.0] -> [(-4.0, 3.0)])
+        self.nav_waypoints = [(raw_wps[i], raw_wps[i+1]) for i in range(0, len(raw_wps), 2)]
         self.bottle_slots = self.get_parameter('bottle_slots').value
-        raw_wps = self.get_parameter('waypoints').value
-        # 1차원 배열로 들어온 waypoints를 2D 튜플 리스트로 변환
-        self.waypoints = [(raw_wps[i], raw_wps[i+1]) for i in range(0, len(raw_wps), 2)]
         self.nav_max_speed = self.get_parameter('nav_max_speed').value
         self.docking_creep_speed = self.get_parameter('docking_creep_speed').value
         self.bumper_threshold_n = self.get_parameter('bumper_threshold_n').value
@@ -576,8 +585,9 @@ class Tron1ControllerNode(Node):
 
         loaded_count = sum(1 for s in self.bottle_slots if s)
         self.get_logger().info(f"  * 스폰 포즈: {self.spawn_pose}")
+        self.get_logger().info(f"  * 일반 자율주행 경유지: {self.nav_waypoints} (총 {len(self.nav_waypoints)}개)")
+        self.get_logger().info(f"  * 고정 도킹 좌표 (하드웨어 상수): 정렬={DOCK_ALIGN_POSE}, 안착={DOCK_TARGET_POSE}")
         self.get_logger().info(f"  * 물병 슬롯 마스크: {self.bottle_slots} (적재: {loaded_count}EA)")
-        self.get_logger().info(f"  * 경유지 목록: {self.waypoints}")
 
         # -------------------------------------------------------------
         # 2. FSM 상태 변수 초기화
@@ -656,11 +666,16 @@ class Tron1ControllerNode(Node):
         self.pitch_deg = float(np.degrees(pitch))
 
     def cmd_undock_callback(self, msg: Bool):
-        if msg.data and self.fsm_state == "READY_FOR_PICK":
-            self.get_logger().info("★ [/tron1/cmd_undock 수신] 언도킹 시퀀스를 개시합니다!")
-            self.fsm_state = "UNDOCKING"
-            self.is_ready_for_pick = False
-            self.state_timer = 0.0
+        if msg.data:
+            if self.fsm_state == "READY_FOR_PICK":
+                self.get_logger().info("★ [/tron1/cmd_undock 수신] 언도킹 시퀀스를 개시합니다!")
+                self.fsm_state = "UNDOCKING"
+                self.is_ready_for_pick = False
+                self.state_timer = 0.0
+            else:
+                self.get_logger().warn(
+                    f"[/tron1/cmd_undock 거부] 로봇이 READY_FOR_PICK 상태가 아닙니다! (현재 FSM: {self.fsm_state})"
+                )
 
     # -----------------------------------------------------------------
     # 50Hz 메인 제어 및 FSM 전이 루프
@@ -785,9 +800,57 @@ if __name__ == '__main__':
 
 ---
 
-### Step 7: 제어기 패키지 빌드 및 독립 노드 구동 테스트
+### Step 7: 패키징 설정 (`setup.py` - YAML 설치 및 실행 진입점 등록)
 
-#### 7.1. 패키지 빌드
+앞선 **Step 5**에서 파라미터 파일(`config/tron1_params.yaml`)을 작성했고, **Step 6**에서 제어기 파이썬 코드(`tron1_controller.py`)를 구현했습니다.
+
+하지만 파이썬 소스 파일과 설정 파일이 워크스페이스 폴더 안에 단순히 존재한다고 해서, ROS 2 시스템(`ros2 run`)이 이를 곧바로 실행할 수 있는 것은 아닙니다. Python 기반 패키지(`ament_python`)에서는 **`setup.py`**를 통해 다음 두 가지를 ROS 2 환경에 명시적으로 등록해야 합니다:
+
+1. **YAML 설정 파일 설치 경로 등록 (`data_files`):**
+   * 소스 디렉토리의 `config/*.yaml` 파일들을 빌드 결과물 디렉토리(`ros2_ws/install/share/tron1_locomotion/config/`)로 복사하여 설치하도록 지시합니다.
+   * 이렇게 해야 노드 실행 시 `--params-file` 옵션으로 파라미터 파일을 안정적으로 찾을 수 있습니다.
+2. **실행 파일 진입점 등록 (`entry_points`):**
+   * 터미널에서 `ros2 run tron1_locomotion tron1_controller` 명령을 입력했을 때, `tron1_locomotion/tron1_controller.py` 모듈 내부의 `main()` 함수가 실행되도록 실행 명령어(console script)를 매핑합니다.
+
+`ros2_ws/src/tron1_locomotion/setup.py` 파일을 열어 아래와 같이 작성합니다:
+
+```python
+import os
+from glob import glob
+from setuptools import find_packages, setup
+
+package_name = 'tron1_locomotion'
+
+setup(
+    name=package_name,
+    version='1.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+        # 1. Step 5에서 작성한 YAML 설정 파일들을 install 디렉토리로 설치 등록
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='korit',
+    maintainer_email='korit@todo.todo',
+    description='ROS 2 FSM Locomotion and Docking Controller Node for Tron1',
+    license='Apache-2.0',
+    entry_points={
+        'console_scripts': [
+            # 2. Step 6에서 구현한 tron1_controller.py의 main() 진입점 매핑
+            'tron1_controller = tron1_locomotion.tron1_controller:main',
+        ],
+    },
+)
+```
+
+---
+
+### Step 8: 제어기 패키지 빌드 및 독립 노드 구동 테스트
+
+#### 8.1. 패키지 빌드
 ROS 2 워크스페이스 루트(`ros2_ws/`)로 이동하여 두 패키지를 함께 빌드합니다:
 
 ```bash
@@ -797,7 +860,7 @@ colcon build --packages-select tron1_interfaces tron1_locomotion
 source install/setup.bash
 ```
 
-#### 7.2. 단독 노드 실행 및 토픽 검증 (Terminal 1)
+#### 8.2. 단독 노드 실행 및 토픽 검증 (Terminal 1)
 ```bash
 ros2 run tron1_locomotion tron1_controller
 ```
@@ -805,16 +868,17 @@ ros2 run tron1_locomotion tron1_controller
 **정상 터미널 출력:**
 ```text
 [INFO] [tron1_controller]: === [Tron1Controller] 초기화 시작 ===
-[INFO] [tron1_controller]:   * 스폰 포즈: [-5.0, -4.0, 0.8, 0.0]
+[INFO] [tron1_controller]:   * 스폰 포즈: [-2.0, -2.0, 0.8, 90.0]
+[INFO] [tron1_controller]:   * 일반 자율주행 경유지: [(-4.0, 3.0)] (총 1개)
+[INFO] [tron1_controller]:   * 고정 도킹 좌표 (하드웨어 상수): 정렬=(-1.0, 0.0), 안착=(0.0, 0.0)
 [INFO] [tron1_controller]:   * 물병 슬롯 마스크: [True, True, True] (적재: 3EA)
-[INFO] [tron1_controller]:   * 경유지 목록: [(-3.0, 3.0), (-0.7, 0.0), (0.27, 0.0)]
 [INFO] [tron1_controller]: === [Tron1Controller] 노드 구동 완료 (50Hz 제어 / 10Hz 상태 보고) ===
 [INFO] [tron1_controller]: >> FSM: LANDING -> IN_PLACE_HOLD
 [INFO] [tron1_controller]: >> FSM: IN_PLACE_HOLD -> WALKING (경유지 자율 보행 개시)
 [INFO] [tron1_controller]: >> FSM: WALKING -> DOCKING_APPROACH (도킹 정렬 및 접근 개시)
 ```
 
-#### 7.3. 토픽 발행 및 인터락 에코 테스트 (Terminal 2)
+#### 8.3. 토픽 발행 및 인터락 에코 테스트 (Terminal 2)
 새로운 터미널 창을 열고 발행되는 토픽을 모니터링합니다:
 
 ```bash
@@ -842,20 +906,40 @@ roll_deg: 0.0
 pitch_deg: 0.0
 bumper_force: 0.0
 tray_vel_rms: 0.0
-base_x: -5.0
-base_y: -4.0
-base_yaw_deg: 0.0
+base_x: -2.0
+base_y: -2.0
+base_yaw_deg: 90.0
 ---
 ```
 
-#### 7.4. 언도킹 신호 수신 원격 테스트 (Terminal 2)
-터미널에서 가상의 언도킹 명령을 발행해 봅니다:
+#### 8.4. 가상 범퍼 접촉 신호 발행 및 도킹 안착 테스트 (Terminal 3)
+로봇이 `DOCKING_APPROACH` 상태에 도달하면 실제 테이블 턱 접촉 반력($\ge 5.0\,\text{N}$)을 기다립니다. MuJoCo 시뮬레이터 연동 전 단독 환경에서는 가상으로 범퍼 접촉 신호(10.0N)를 퍼블리시하여 도킹 인터락(`READY_FOR_PICK`) 진입을 시험합니다:
+
+```bash
+ros2 topic pub --once /tron1/bumper_wrench geometry_msgs/msg/WrenchStamped "{wrench: {force: {x: 10.0}}}"
+```
+
+* **노드 터미널(Terminal 1) 반응 확인:**
+  1. `>> FSM: 범퍼 접촉 감지 (10.0N)! STANCE_LOCK 진입 (발 5cm 후퇴 3점 지지 체결)` 로그 출력.
+  2. 3.0초간 정적 무진동 수평 유지(`vibration_hold_time_s: 3.0`) 후:
+  3. `★ [READY_FOR_PICK] 3초 정적 무진동 수평 확립! UR5e 피킹 권한을 승인합니다.` 출력!
+
+#### 8.5. 언도킹 신호 수신 원격 테스트 (Terminal 3)
+로봇이 `READY_FOR_PICK` 상태에 도달한 후, 상위 시스템(UR5e 로봇팔 또는 작업 관리자)으로부터 물병 이송 완료에 따른 가상의 언도킹 명령을 발행합니다:
 
 ```bash
 ros2 topic pub --once /tron1/cmd_undock std_msgs/msg/Bool "{data: true}"
 ```
 
-노드 터미널(Terminal 1)에서 정상적으로 신호를 수신하여 반응하는지 로그를 확인합니다.
+* **노드 터미널(Terminal 1) 최종 순환 반응 확인:**
+```text
+★ [/tron1/cmd_undock 수신] 언도킹 시퀀스를 개시합니다!
+>> FSM: UNDOCKING 후진 완료 -> WALKING (원점 복귀 보행 개시)
+>> FSM: WALKING -> IN_PLACE_HOLD (원점 복귀 완료, 제자리 발구름 대기)
+```
+
+> [!TIP]
+> **안전 인터락 검증**: 만약 로봇이 `READY_FOR_PICK` 상태가 아닐 때(예: `WALKING` 또는 `DOCKING_APPROACH` 중) `/tron1/cmd_undock` 명령을 보내면, 안전 인터락에 의해 명령이 즉시 거부되고 터미널에 `[WARN] [/tron1/cmd_undock 거부] 로봇이 READY_FOR_PICK 상태가 아닙니다! (현재 FSM: DOCKING_APPROACH)` 경고 로그가 출력됩니다.
 
 ---
 

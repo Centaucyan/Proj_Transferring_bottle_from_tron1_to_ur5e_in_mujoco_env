@@ -1,0 +1,33 @@
+tron1_controller:
+  ros__parameters:
+    # 1. Tron1 초기 스폰 포즈 [X (m), Y (m), Z (m), Yaw (deg)]
+    spawn_pose: [-2.0, -2.0, 0.80, 90.0]
+
+    # 2. 일반 자율 주행 경유지 리스트 [X1, Y1, X2, Y2, ...]
+    # ※ 장애물 우회나 경로 변경이 필요할 때 자유롭게 (X, Y) 좌표 쌍을 추가/삭제할 수 있습니다.
+    # • 경유지 1개 예시: [-4.0, 3.0]
+    # • 경유지 2개 예시: [-4.0, 0.0, -4.0, 3.0] (순서대로 추종)
+    # • 경유지 0개 예시: [] (장애물 없이 도킹 정렬 지점으로 직행)
+    # ※ 리스트의 모든 경유지를 통과(WALKING)하면 제어기가 자동으로 고정 도킹 시퀀스(DOCKING_APPROACH)로 진입합니다.
+    #    (도킹 정렬 지점 [-1.0, 0.0] 및 안착 목표점 [0.0, 0.0]은 하드웨어 안전을 위해 파이썬 코드 상수로 고정됨)
+    nav_waypoints: [-4.0, 3.0]
+
+    # 3. 트레이 슬롯별 물병 적재 마스크 [Slot 1 (좌), Slot 2 (중앙), Slot 3 (우)]
+    # • [true, true, true]: 물병 3개 만재
+    # • [true, false, true]: 1번, 3번만 적재 (가운데 비움)
+    # • [true, false, false]: 1번(좌측)만 적재 (비대칭 하중)
+    # • [false, false, false]: 물병 없음 (빈 트레이 주행 및 도킹 테스트)
+    bottle_slots: [true, true, true]
+
+    # 4. 주행 및 내비게이션 제어 게인
+    nav_linear_kp: 0.6          # 경유지 접근 선속도 비례 게인
+    nav_max_speed: 0.65         # 최대 직진 속도 (m/s)
+    nav_reach_dist: 0.35        # 경유지 도달 판정 반경 (m)
+    docking_creep_speed: 0.15   # DOCKING_APPROACH 진입 후 범퍼 접촉을 위한 저속 크리핑 속도 (m/s)
+
+    # 5. 도킹 및 수평 인터락 판정 임계값
+    bumper_threshold_n: 5.0     # 범퍼 터치 접촉 감지 최소 반력 (N)
+    target_bumper_force_n: 9.0  # 능동 반력 순응 제어 목표 지탱력 (N)
+    leveling_hip_extension: 0.18 # 수평화 고관절 신전 보정각 (rad)
+    vibration_threshold_rms: 0.005 # 정적 무진동 수렴 판정 RMS (m/s)
+    vibration_hold_time_s: 3.0  # 정적 무진동 지속 요구 시간 (초)

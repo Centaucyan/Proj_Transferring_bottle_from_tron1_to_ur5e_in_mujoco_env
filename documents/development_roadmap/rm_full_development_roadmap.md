@@ -14,7 +14,7 @@
   3. **역할 분담에 충실한 인터페이스 설계 (SoC):**
      * 물병 개수는 트론1이 관여하지 않고 카메라 비전 시스템이 자체 판정하도록 메시지 구조에서 제외하며, 트론1은 자세 안정성(FSM 상태, 수평 각도, 범퍼 반력, 피킹 준비 플래그)에 집중.
   4. **파라미터 기반 동적 환경 구성 (하드코딩 배제):**
-     * Tron1의 시작 위치(`spawn_pose`), 주행 경유지(`waypoints`), 트레이 슬롯별 적재 마스크(`bottle_slots: [bool, bool, bool]`)를 외부 YAML 파라미터로 분리.
+     * Tron1의 시작 위치(`spawn_pose`), 일반 주행 경유지(`nav_waypoints`), 트레이 슬롯별 적재 마스크(`bottle_slots: [bool, bool, bool]`)를 외부 YAML 파라미터로 분리. (도킹 좌표는 하드웨어 안전 불변 상수로 고정)
      * MuJoCo Site 기반 순방향 기구학(FK)을 통해 로봇 위치 변경 및 빈 트레이/비대칭 하중 상태를 0.000mm 오차로 자동 동기화.
   5. **ROS 2 & MoveIt 2 네이티브 파이프라인:**
      * 임시 IK 중복 코딩을 배제하고, 통합 씬 확장에 맞춰 공식 MoveIt 2 충돌 회피 플래닝과 OpenCV/Open3D 비전 파이프라인으로 직행.
@@ -142,7 +142,7 @@ flowchart TD
 * **역할 분담에 따른 메시지 설계 (SoC):**
   * 트론1은 물병 개수를 알 수 없으므로 `bottle_count` 필드는 배제하고, FSM 상태, 피킹 준비 상태 플래그(`is_ready_for_pick`), 자세 각도(Roll/Pitch), 범퍼 반력 데이터에 집중.
 * **파라미터 기반 환경 및 하중 구성 (YAML):**
-  * 로봇 초기 스폰 위치(`spawn_pose`), 주행 경유지 목록(`waypoints`), 트레이 슬롯별 적재 마스크(`bottle_slots: [bool, bool, bool]`)를 외부 YAML 파일로 분리하여 하드코딩 완전 배제.
+  * 로봇 초기 스폰 위치(`spawn_pose`), 일반 주행 경유지 목록(`nav_waypoints`), 트레이 슬롯별 적재 마스크(`bottle_slots: [bool, bool, bool]`)를 외부 YAML 파일로 분리하고, 도킹 좌표는 하드웨어 안전 불변 상수로 정의.
 * **양방향 인터락 (Handshake & Interlock):**
   * `READY_FOR_PICK` 상태 진입 시 `/tron1/status` 토픽 발행.
   * 상위 시스템으로부터 `/tron1/cmd_undock` 토픽 수신 시 안전하게 언도킹 후진(0.15m) 후 복귀하는 이벤트 구동 구조.

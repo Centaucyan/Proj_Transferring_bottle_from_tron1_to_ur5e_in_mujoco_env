@@ -16,13 +16,18 @@
 1. xml_for_unit_test/phase01_u02_scene_unit_payload.xml
 2. scripts_devel_roadmap/phase01_u02_test_payload.py
 
-=== Phase 02_U00 ===
+=== Phase 02 ===
 @ 생성
-1. ros2/src/ 폴더 
+1. ros2_ws/src/ 폴더 
 2. 'tron1_interfaces' ROS2 패키지
-3. /ros2/src/tron1_interfaces/msg/ 폴더
-4. /ros2/src/tron1_interfaces/msg/Tron1Status.msg
+3. /ros2_ws/src/tron1_interfaces/msg/ 폴더
+4. /ros2_ws/src/tron1_interfaces/msg/Tron1Status.msg
+5. 'tron1_locomotion' ROS2 패키지
+6. /ros2_ws/src/tron1_locomotion/config/ 폴더
+7. /ros2_ws/src/tron1_locomotion/config/tron1_params.yaml
+8. /ros2_ws/src/tron1_locomotion/tron1_locomotion/tron1_controller.py
 
 @ 수정
-1. /ros2/src/tron1_interfaces/package.xml
-2. /ros2/src/tron1_interfaces/CMakeLists.txt
+1. /ros2_ws/src/tron1_interfaces/package.xml
+2. /ros2_ws/src/tron1_interfaces/CMakeLists.txt
+3. /ros2_ws/src/tron1_locomotion/setup.py

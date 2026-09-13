@@ -3,8 +3,8 @@
 
 * **문서 버전:** v1.0
 * **작성일:** 2026-09-11
-* **관련 소스 코드:** [`scripts_devel_roadmap/phase01_u02_test_tron1_payload.py`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/scripts_devel_roadmap/phase01_u02_test_tron1_payload.py)
-* **관련 씬 모델:** [`xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`](file:///media/korit/4AD6F9D1D6F9BCEF/Tae_ws/Project/Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml)
+* **관련 소스 코드:** [`Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/scripts_devel_roadmap/phase01_u02_test_tron1_payload.py`](../../scripts_devel_roadmap/phase01_u02_test_tron1_payload.py)
+* **관련 씬 모델:** [`Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml`](../../xml_for_unit_test/phase01_u02_scene_unit_tron1_payload.xml)
 
 ---
 
@@ -30,18 +30,15 @@ stateDiagram-v2
     IN_PLACE_HOLD --> WALKING : [조건] 제자리 발구름 1.0s 경과 (자동/키보드 'D')
     
     state WALKING {
-        [*] --> WP0_TURN : 1차 경유지(-3, 3) 방향 회전
-        WP0_TURN --> WP0_WALK : 회전 오차 < 8°
-        WP0_WALK --> WP1_TURN : WP0 도달 (거리 < 0.35m)
-        WP1_TURN --> WP1_WALK : 도킹 진입 경유지(-0.7, 0) 방향 보행
-        WP1_WALK --> [*] : WP1 도달 (거리 < 0.25m)
+        [*] --> WP_FOLLOW : 일반 경유지(nav_waypoints) 순차 추종
+        WP_FOLLOW --> [*] : 모든 nav_waypoints 통과 완료 (거리 < 0.35m)
     }
 
-    WALKING --> DOCKING_APPROACH : [조건] 도킹 진입 경유지(WP1) 도달
+    WALKING --> DOCKING_APPROACH : [조건] nav_waypoints 주행 완료
 
     state DOCKING_APPROACH {
-        [*] --> TABLE_ALIGN : 테이블 전면 직각 정렬 (|Yaw| < 3°)
-        TABLE_ALIGN --> DOCK_CREEP : 직각 정렬 완료 ➔ 극저속(0.04m/s) 직진 접근
+        [*] --> TABLE_ALIGN : 도킹 정렬 지점 DOCK_ALIGN_POSE(-1.0, 0.0) 이동 및 직각 정렬 (|Yaw| < 3°)
+        TABLE_ALIGN --> DOCK_CREEP : 직각 정렬 완료 ➔ DOCK_TARGET_POSE(0.0, 0.0) 극저속(0.04m/s) 직진 접근
         DOCK_CREEP --> [*] : 범퍼 접촉 대기
     }
 
@@ -79,8 +76,8 @@ stateDiagram-v2
 | :---: | :--- | :--- | :--- | :---: | :--- |
 | **1** | **`LANDING`** | • LimX 공식 RL 정책<br>• `stepping` 모드 초기화 | 공중($Z=0.80\,\text{m}$) 스폰 후 바닥 착지 시 충격 흡수 및 직립 균형 복원 | ➔ `IN_PLACE_HOLD` | • 스폰 후 **시간 $t \ge 0.15\,\text{s}$ 경과**<br>• 좌/우 발바닥 지면 접촉 감지 |
 | **2** | **`IN_PLACE_HOLD`** | • LimX 공식 RL 정책<br>• 상체 로컬 PD 원점 유지 | (1) 초기 스폰: 물병 3개 편하중 감지 및 원점($X_0, Y_0$) 안정 대기<br>(2) 최종 복귀: 원점 복귀 후 영구 제자리 발구름 유지 | ➔ `WALKING`<br>*(초기 출발 시)* | • 제자리 안정 발구름 **1.0초 경과** (자동 모드)<br>*(수동 조작 시 `[D]` 키 입력)*<br>*(※ 최종 복귀 후에는 상태 유지)* |
-| **3** | **`WALKING`** | • 다단계 경로점 추종 RL 보행<br>• 최대 속도 $0.4\,\text{m/s}$ | (1) 출발: WP0 경유 후 도킹 진입 경유지(WP1)까지 자율 보행<br>(2) 복귀: 언도킹 후 원래 스폰 시작 원점($X_0, Y_0$)으로 복귀 보행 | ➔ `DOCKING_APPROACH`<br>*(도킹 진입 시)*<br>➔ `IN_PLACE_HOLD`<br>*(원점 복귀 시)* | • 출발 보행 시: **도킹 진입 경유지(WP1) 도달** (거리 $< 0.25\,\text{m}$)<br>• 복귀 보행 시: **스폰 시작 원점($X_0, Y_0$) 도달** (거리 $< 0.15\,\text{m}$) |
-| **4** | **`DOCKING_APPROACH`** | • 직각 정렬 제어<br>• 극저속 크리핑 ($0.04\,\text{m/s}$) | 테이블 정면 직각(Yaw=0°) 정렬 후 테이블 턱을 향해 극저속 직진 접근 | ➔ `STANCE_LOCK` | • 전면 범퍼 터치 센서 **접촉 반력 $F \ge 2.0\,\text{N}$ 감지**<br>*(또는 $X \ge 0.258\,\text{m}$ 및 $F \ge 0.5\,\text{N}$)* |
+| **3** | **`WALKING`** | • 다단계 경로점 추종 RL 보행<br>• 최대 속도 $0.65\,\text{m/s}$ | (1) 출발: YAML의 `nav_waypoints`를 순차적으로 자율 추종 보행<br>(2) 복귀: 언도킹 후 원래 스폰 시작 원점($X_0, Y_0$)으로 복귀 보행 | ➔ `DOCKING_APPROACH`<br>*(도킹 진입 시)*<br>➔ `IN_PLACE_HOLD`<br>*(원점 복귀 시)* | • 출발 보행 시: **모든 `nav_waypoints` 도달 완료** (거리 $< 0.35\,\text{m}$)<br>• 복귀 보행 시: **스폰 시작 원점($X_0, Y_0$) 도달** (거리 $< 0.15\,\text{m}$) |
+| **4** | **`DOCKING_APPROACH`** | • 직각 정렬 제어<br>• 극저속 크리핑 ($0.15\,\text{m/s}$) | 고정 정렬 지점(`[-1.0, 0.0]`)에서 테이블 직각(Yaw=0°) 정렬 후 고정 안착점(`[0.0, 0.0]`)을 향해 극저속 직진 접근 | ➔ `STANCE_LOCK` | • 전면 범퍼 터치 센서 **접촉 반력 $F \ge 2.0\,\text{N}$ 감지** |
 | **5** | **`STANCE_LOCK`** | • 발 5cm 후퇴 기구학<br>• 발구름 정지 (`stepping OFF`)<br>• 0.5초 동시 수평화 보간<br>• 능동 범퍼 반력 순응 제어 | • 범퍼 접촉 유지한 채 발을 뒤로 5cm 후퇴시켜 3점 지지 형성 후 발구름 정지<br>• 고관절 신전(+0.18 rad)으로 **Roll=0°, Pitch=0° 동시 수평 정렬**<br>• 반력 9N 순응 제어로 풋 크립 방지 | ➔ `READY_FOR_PICK` | • $|Roll| < 1.0^\circ$ 및 $|Pitch| < 1.0^\circ$<br>• 트레이 진동 속도 $< 0.08\,\text{m/s}$<br>• 위 조건이 **3.0초간 연속 유지**될 때 |
 | **6** | **`READY_FOR_PICK`** | • 도킹 정밀 고정 락<br>(`dock_locked_qpos` 복제)<br>• 이동량 0.000mm 부동 | • UR5e 피킹 공차(0mm) 보장을 위한 완전 고정<br>• ROS 2 토픽 `/tron1/status`에 **`READY_FOR_PICK` 발행** | ➔ `UNDOCKING` | • UR5e로부터 물병 3개 이송 완료 신호<br>(`/tron1/cmd_undock = True`) 수신 시 |
 | **7** | **`UNDOCKING`** | • 도킹 클램프 해제<br>• RL 발구름 재개<br>• 안전 후진 속도 ($V_x = -0.15\,\text{m/s}$) | 테이블 모서리에서 안전하게 뒤로 0.15m 물러난 후 원점 복귀 보행(`WALKING`)으로 인계 | ➔ `WALKING` | • 도킹 시작 위치 대비 **후진 거리 $\Delta X \ge 0.15\,\text{m}$**<br>*(안전 타임아웃: 2.5초 경과 시)* |
@@ -122,22 +119,20 @@ stateDiagram-v2
 ---
 
 ### 4.3 State 3: `WALKING` (경유지 자율 보행 및 원점 복귀 보행)
-* **목적:** 광범위한 맵 환경에서 다단계 경유지(WP0, WP1)를 통과하여 도킹 진입 구역까지 이동하거나, 언도킹 완료 후 원래 스폰 위치(원점)로 자율 복귀.
+* **목적:** 광범위한 맵 환경에서 일반 경유지(`nav_waypoints`)를 통과하여 도킹 진입 구역까지 이동하거나, 언도킹 완료 후 원래 스폰 위치(원점)로 자율 복귀.
 * **동작 원리:**
   1. **정방향 경유지 보행 (Forward Path):**  
-     1차 경유지(WP0: $X=-3.0, Y=+3.0$) 및 2차 도킹 진입 경유지(WP1: $X=-0.70, Y=0.0$) 방향으로의 선회 및 최대 $0.4\,\text{m/s}$ 보행.
+     YAML에 설정된 자율 주행 경유지(예: `[-4.0, 3.0]`) 목록을 순차적으로 추종하며 최대 $0.65\,\text{m/s}$ 보행.
   2. **역방향 원점 복귀 보행 (Return Path):**  
      언도킹 후진 완료 후 스폰 시작 원점($X_0, Y_0$)을 향해 방향 전환 후 자율 복귀 주행.
 * **세부 서브페이즈 (Sub-Phases):**
-  1. `WP0_TURN`: 1차 경유지를 향해 제자리 선회.
-  2. `WP0_WALK`: 최대 $0.4\,\text{m/s}$로 1차 경유지까지 전진 주행.
-  3. `WP1_TURN`: 도킹 진입 경유지를 향해 선회.
-  4. `WP1_WALK`: 도킹 진입 경유지(거리 $< 0.25\,\text{m}$)까지 전진 주행.
-  5. `RETURN_WALK`: 언도킹 후 원래 스폰 위치($X_0, Y_0$)로 복귀 주행.
+  1. `WP_TURN`: 현재 목표 경유지를 향해 제자리 선회.
+  2. `WP_FOLLOW`: YAML의 `nav_waypoints` 목표점(거리 $< 0.35\,\text{m}$)까지 순차 추종 전진 주행.
+  3. `RETURN_WALK`: 언도킹 후 원래 스폰 위치($X_0, Y_0$)로 복귀 주행.
 * **전이 조건 검사 코드:**
   ```python
-  # 1) 출발 보행: 도킹 진입 경유지(WP1) 도달 시 도킹 정렬/접근으로 전이
-  if not self.has_docked and dist_to_wp1 < 0.25:
+  # 1) 출발 보행: 모든 일반 경유지(nav_waypoints) 도달 시 도킹 접근으로 전이
+  if not self.has_docked and self.current_wp_idx >= len(self.nav_waypoints):
       self.fsm_state = "DOCKING_APPROACH"
       self.nav_phase = "TABLE_ALIGN"
   # 2) 복귀 보행: 원래 스폰 시작 원점(X0, Y0) 도달 시 제자리 발구름 대기로 전이
@@ -149,13 +144,13 @@ stateDiagram-v2
 ---
 
 ### 4.4 State 4: `DOCKING_APPROACH` (도킹 정면 정렬 및 극저속 크리핑)
-* **목적:** 도킹 진입 경유지(WP1) 도달 후 작업대 전면에 완벽한 직각($|Yaw| < 3^\circ$)으로 정렬하고, 물병 낙하를 방지하기 위해 극저속($0.04\,\text{m/s}$)으로 크리핑하여 테이블 턱에 접촉.
+* **목적:** 일반 경유지 주행 완료 후, 도킹 정렬 지점(`DOCK_ALIGN_POSE = (-1.0, 0.0)`)에서 작업대 전면 직각($|Yaw| < 3^\circ$)으로 정렬하고, 물병 낙하를 방지하기 위해 극저속($0.15\,\text{m/s}$)으로 안착 목표점(`DOCK_TARGET_POSE = (0.0, 0.0)`)을 향해 크리핑하여 테이블 턱에 접촉.
 * **세부 서브페이즈 (Sub-Phases):**
-  1. `TABLE_ALIGN`: 테이블 전면과 완벽한 직각($|Yaw| < 3.0^\circ$)을 형성하도록 미세 각도 보정.
-  2. `DOCK_CREEP`: 물병 출렁임을 방지하기 위해 $0.04\,\text{m/s}$ 극저속으로 크리핑 직진.
+  1. `TABLE_ALIGN`: 도킹 정렬 지점(`[-1.0, 0.0]`)에서 테이블 전면과 완벽한 직각($|Yaw| < 3.0^\circ$)을 형성하도록 미세 각도 보정.
+  2. `DOCK_CREEP`: 안착 목표점(`[0.0, 0.0]`)을 향해 물병 출렁임을 방지하며 $0.15\,\text{m/s}$ 저속으로 크리핑 직진.
 * **전이 조건 검사 코드:**
   ```python
-  touch_detected = (bumper_force >= 2.0) or (pos_x >= 0.258 and bumper_force >= 0.5)
+  touch_detected = (bumper_force >= 2.0)  # 터치 센서 접촉 반력 2.0N 이상 감지
   if touch_detected and self.nav_phase == "DOCK_CREEP":
       self.fsm_state = "STANCE_LOCK"
   ```
