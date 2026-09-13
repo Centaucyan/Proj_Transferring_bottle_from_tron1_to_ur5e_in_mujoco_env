@@ -325,7 +325,7 @@ Conda 가상환경 내에 시뮬레이션 및 비전 핵심 패키지를 설치�
 ```bash
 # 가상환경 격리 보장을 위해 python -m pip 사용 권장
 python -m pip install --upgrade pip
-python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot
+python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime "empy==3.3.4" lark
 ```
 
 설치가 완료되면, Python 대화형 인터프리터나 한 줄 명령어로 핵심 라이브러리를 순차적으로 임포트해 봅니다:

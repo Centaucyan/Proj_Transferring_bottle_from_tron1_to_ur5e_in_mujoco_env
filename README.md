@@ -188,7 +188,7 @@ source /opt/ros/humble/setup.bash
 
 # 가상환경 내 시뮬레이터 및 비전 라이브러리 설치
 python -m pip install --upgrade pip
-python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime
+python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime "empy==3.3.4" lark
 ```
 
 #### 💡 Python 핵심 패키지(pip) 주요 역할 및 기능 요약
@@ -207,12 +207,14 @@ python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy sci
 | **`typeguard`** | 런타임 타입 검증 | ROS 2 파라미터 생성 라이브러리(`generate-parameter-library-py`) 의존성 충족 및 타입 안전성 보장 |
 | **`pydot`** | BT 시각화 | `py_trees` 내부의 트리 구조 시각화 및 DOT 그래프 렌더링 지원 (Conda 격리 환경 필수 의존성) |
 | **`onnxruntime`** | 기계학습 추론 | LimX Dynamics 공식 사전 훈련 강화학습 정책(policy.onnx, encoder.onnx)을 CPU에서 500Hz로 실시간 추론하여 Tron1 제자리 발구름 및 균형 제어 |
+| **`empy==3.3.4`** | 코드 생성기 | ROS 2 커스텀 인터페이스(`.msg`, `.srv`) 빌드 시 C++/Python 코드를 생성하는 템플릿 엔진 (`rosidl_adapter` 필수 의존성, 3.x 버전 고정) |
+| **`lark`** | 구문 분석 | ROS 2 IDL 인터페이스 정의 파서 및 문법 분석 엔진 |
 
 ---
 
 ### 3.4. 환경 정상 연동 검증
 ```bash
-python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
+python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; import em; import lark; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
 ```
 ---
 

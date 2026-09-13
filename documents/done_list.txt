@@ -10,3 +10,19 @@
 @ 생성
 1. xml_for_unit_test/phase01_u01_scene_unit_tron1.xml
 2. scripts_devel_roadmap/phase01_u01_test_tron1_walking_rl.py
+
+=== Phase 01_U02 ===
+@ 생성
+1. xml_for_unit_test/phase01_u02_scene_unit_payload.xml
+2. scripts_devel_roadmap/phase01_u02_test_payload.py
+
+=== Phase 02_U00 ===
+@ 생성
+1. ros2/src/ 폴더 
+2. 'tron1_interfaces' ROS2 패키지
+3. /ros2/src/tron1_interfaces/msg/ 폴더
+4. /ros2/src/tron1_interfaces/msg/Tron1Status.msg
+
+@ 수정
+1. /ros2/src/tron1_interfaces/package.xml
+2. /ros2/src/tron1_interfaces/CMakeLists.txt

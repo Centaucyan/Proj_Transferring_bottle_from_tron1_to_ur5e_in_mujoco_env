@@ -66,7 +66,7 @@ flowchart LR
     end
 
     subgraph PkgLocomotion ["tron1_locomotion (ament_python)"]
-        NodeCtrl["tron1_controller (ROS 2 Node)<br/>• 50Hz 제어 루프<br/>• ONNX RL 정책 추론<br/>• 6대 FSM 상태 천이<br/>• 파라미터 동적 로드"]
+        NodeCtrl["tron1_controller (ROS 2 Node)<br/>• 50Hz 제어 루프<br/>• ONNX RL 정책 추론<br/>• 7대 FSM 상태 천이<br/>• 파라미터 동적 로드"]
     end
 
     subgraph Bridge ["Phase 03 연계 대상 (sim_bridge)"]
@@ -171,7 +171,7 @@ flowchart TD
 기존 `while True:` 무한 루프 방식에서 ROS 2의 **타이머 기반 비동기 이벤트 루프(Timer-driven Asynchronous Loop)**로 전환합니다:
 
 * **50Hz 메인 제어 타이머 (`create_timer(0.02, self.control_loop)`):**
-  * RL 정책 인퍼런스 및 6대 FSM 상태 머신 전이 조건 평가.
+  * RL 정책 인퍼런스 및 7대 FSM 상태 머신 전이 조건 평가.
   * 계산된 관절 목표 각도 퍼블리시.
 * **10Hz 상태 보고 타이머 (`create_timer(0.1, self.status_publish_loop)`):**
   * `/tron1/status` 토픽으로 현재 로봇의 FSM 상태 및 도킹 안정성 데이터 발행.
@@ -233,7 +233,7 @@ mkdir -p tron1_interfaces/msg
 std_msgs/Header header
 
 # 1. 유한 상태 머신 (FSM) 상태
-# 가능 상태: LANDING, IN_PLACE_HOLD, DOCKING_APPROACH, STANCE_LOCK, READY_FOR_PICK, UNDOCKING
+# 가능 상태: LANDING, IN_PLACE_HOLD, WALKING, DOCKING_APPROACH, STANCE_LOCK, READY_FOR_PICK, UNDOCKING
 string fsm_state
 
 # 2. 내비게이션 세부 페이즈 (DOCKING_APPROACH 상태일 때)
@@ -285,6 +285,42 @@ float32 base_yaw_deg
 </package>
 ```
 
+#### 💡 `package.xml` 의존성 태그 상세 원리 및 왜 이렇게 작성하는가?
+
+우리가 작성한 `Tron1Status.msg`는 단순한 텍스트 파일입니다. 컴퓨터(C++ 노드나 Python 노드)가 이 메시지를 이해하고 네트워크(DDS)로 직렬화하여 송수신하려면 C++ 헤더 파일과 Python 바인딩 모듈로 변환되어야 합니다. 여기에 추가된 각 태그는 다음과 같은 핵심 역할을 담당합니다:
+
+```text
+[Tron1Status.msg (텍스트)]
+       │
+       ▼  <buildtool_depend> rosidl_default_generators
+(빌드 시점에 파이썬 스크립트 툴체인이 소스코드를 자동 생성)
+       │
+       ├─ C++ 헤더:   Tron1Status.hpp, Tron1Status__struct.hpp ...
+       └─ Python 모듈: _tron1_status_s.ep.urandom.c, Tron1Status.py ...
+       │
+       ▼  <exec_depend> rosidl_default_runtime
+(실행 시점에 DDS 바이너리 직렬화/역직렬화 엔진을 통해 통신 송수신)
+```
+
+1. **`<buildtool_depend>rosidl_default_generators</buildtool_depend>`**
+   * **역할:** 빌드할 때 `.msg` 파일을 읽어서 **C++ 소스코드와 Python 바인딩 코드를 '생성(Generate)'해 주는 도구(Tool)**입니다.
+   * **왜 `build_depend`가 아닌가?:** 일반적인 `build_depend`는 컴파일할 때 링크할 라이브러리(헤더/바이너리)를 뜻하지만, `buildtool_depend`는 **"코드를 빌드하기 위해 호스트 OS에서 실행되어야 하는 빌드 전용 실행 도구(마치 cmake, make, gcc처럼)"**를 의미합니다. `rosidl_default_generators`는 파이썬 기반의 코드 생성 엔진이며, `CMakeLists.txt`의 `rosidl_generate_interfaces()` 명령어를 실행시켜 주는 주체입니다.
+
+2. **`<exec_depend>rosidl_default_runtime</exec_depend>`**
+   * **역할:** 생성된 메시지를 사용하는 노드가 실제로 터미널에서 **실행(Run)될 때 필요한 런타임 엔진**입니다.
+   * **왜 `build_depend`가 아닌가?:** 코드를 생성할 때(`colcon build`)는 `generators`만 있으면 되지만, 빌드가 끝난 뒤 노드를 구동(`ros2 run`)할 때는 생성된 메시지를 네트워크 패킷(eProsima Fast CDR 등)으로 압축(직렬화)하고 복원(역직렬화)할 수 있는 **런타임 라이브러리(`rosidl_default_runtime`)**가 메모리에 로드되어 있어야 합니다. 즉, 실행 시점에만 필요하므로 `<exec_depend>`(Execution Dependency)로 지정합니다.
+
+3. **`<member_of_group>rosidl_interface_packages</member_of_group>`**
+   * **역할:** ament 빌드 시스템에게 **"이 패키지는 일반 C++ 노드가 아니라, 순수한 인터페이스(메시지/서비스) 패키지 그룹의 일원이다!"**라고 알려주는 그룹 선언 메타 태그입니다.
+   * **필요성:** 이 선언이 있어야 colcon 빌드 툴과 ament 시스템이 인터페이스 패키지 전용 CMake 훅(Hook)과 환경 변수를 올바르게 인덱싱하여, 다른 패키지에서 `from tron1_interfaces.msg import Tron1Status`를 임포트할 때 모듈을 찾지 못하는 링킹 오류를 방지합니다.
+
+4. **`<depend>std_msgs</depend>`**
+   * **역할:** 표준 메시지 패키지인 `std_msgs`를 참조하겠다는 선언입니다.
+   * **필요성:** `Tron1Status.msg` 첫 줄의 `std_msgs/Header header` 필드처럼, ROS 2 표준 헤더(타임스탬프 및 프레임 ID)를 부품으로 재사용(Composition)하기 위해 필수적입니다.
+   * **왜 `<depend>`인가?:** `<depend>`는 `<build_depend>`, `<build_export_depend>`, `<exec_depend>` 3가지를 한 줄로 합쳐놓은 축약 태그입니다. 표준 메시지 타입은 빌드 시점(헤더 참조)과 실행 시점(데이터 처리) 모두에 계속 필요하므로 `<depend>`로 한 번에 선언합니다.
+
+---
+
 #### 2.4. `CMakeLists.txt` 수정
 `ros2_ws/src/tron1_interfaces/CMakeLists.txt` 파일을 열어 메시지 빌드 지시어를 추가합니다:
 
@@ -308,6 +344,17 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 ament_package()
 ```
+
+#### 🔗 `package.xml`과 `CMakeLists.txt`의 완벽한 1:1 대응 관계
+
+`package.xml`의 의존성 선언과 `CMakeLists.txt`의 빌드 매크로는 다음과 같이 완벽하게 짝(Pair)을 이루며 동작합니다:
+
+| `package.xml` 선언 태그 | `CMakeLists.txt` 대응 명령어 | 역할 및 동작 원리 |
+| :--- | :--- | :--- |
+| `<buildtool_depend>rosidl_default_generators...` | `find_package(rosidl_default_generators REQUIRED)` | `.msg`를 C++/Python 코드로 변환할 코드 생성기 빌드 툴을 CMake로 로드 |
+| `<depend>std_msgs</depend>` | `find_package(std_msgs REQUIRED)`<br>`rosidl_generate_interfaces(... DEPENDENCIES std_msgs)` | 외부 의존 메시지 패키지를 로드하고, `Header` 타입 변환 시 의존성을 바인딩 |
+| `<exec_depend>rosidl_default_runtime...` | *(CMake 내부 `rosidl` 매크로가 자동으로 런타임 링크 주입)* | 빌드 후 패키지 설치 시 실제 통신 직렬화에 필요한 런타임 종속성을 배포 환경에 자동 전달 |
+| `<member_of_group>rosidl_interface_packages...` | `ament_package()` | 패키지를 ament 인터페이스 그룹으로 등록하여 다른 노드 패키지에서 즉시 임포트할 수 있도록 환경 변수 및 훅 설정 |
 
 ---
 
@@ -537,6 +584,7 @@ class Tron1ControllerNode(Node):
         self.current_wp_idx = 0
         self.is_ready_for_pick = False
         self.is_stance_locked = False
+        self.has_docked = False
         self.state_timer = 0.0
         self.stable_timer = 0.0
 
@@ -627,13 +675,31 @@ class Tron1ControllerNode(Node):
 
         # [FSM 상태 2: IN_PLACE_HOLD]
         elif self.fsm_state == "IN_PLACE_HOLD":
-            if self.state_timer >= 2.0:
-                self.fsm_state = "DOCKING_APPROACH"
+            if not self.has_docked and self.state_timer >= 2.0:
+                self.fsm_state = "WALKING"
                 self.state_timer = 0.0
                 self.nav_phase = "WP0_TURN"
-                self.get_logger().info(">> FSM: IN_PLACE_HOLD -> DOCKING_APPROACH (내비게이션 개시)")
+                self.get_logger().info(">> FSM: IN_PLACE_HOLD -> WALKING (경유지 자율 보행 개시)")
+            elif self.has_docked:
+                pass  # 원점 복귀 후 제자리 발구름 지속
 
-        # [FSM 상태 3: DOCKING_APPROACH]
+        # [FSM 상태 3: WALKING]
+        elif self.fsm_state == "WALKING":
+            # 1) 도킹 전 정방향 경유지 보행 (WP0 -> WP1 도달 시 도킹 접근 전이)
+            if not self.has_docked:
+                if self.state_timer >= 4.0:  # 데모 타이머 (실제 구동 시 WP1 도달 거리 판정)
+                    self.fsm_state = "DOCKING_APPROACH"
+                    self.state_timer = 0.0
+                    self.nav_phase = "TABLE_ALIGN"
+                    self.get_logger().info(">> FSM: WALKING -> DOCKING_APPROACH (도킹 정렬 및 접근 개시)")
+            # 2) 언도킹 후 스폰 원점 복귀 보행 (원점 도달 시 IN_PLACE_HOLD 전이)
+            else:
+                if self.state_timer >= 4.0:  # 데모 타이머 (실제 구동 시 스폰 원점 도달 거리 판정)
+                    self.fsm_state = "IN_PLACE_HOLD"
+                    self.state_timer = 0.0
+                    self.get_logger().info(">> FSM: WALKING -> IN_PLACE_HOLD (원점 복귀 완료, 제자리 발구름 대기)")
+
+        # [FSM 상태 4: DOCKING_APPROACH]
         elif self.fsm_state == "DOCKING_APPROACH":
             # 범퍼 접촉 반력 임계값 감지 판정
             if self.bumper_force >= self.bumper_threshold_n:
@@ -642,7 +708,7 @@ class Tron1ControllerNode(Node):
                 self.is_stance_locked = True
                 self.get_logger().info(f">> FSM: 범퍼 접촉 감지({self.bumper_force:.1f}N)! STANCE_LOCK 진입 (발 5cm 후퇴 3점 지지 체결)")
 
-        # [FSM 상태 4: STANCE_LOCK]
+        # [FSM 상태 5: STANCE_LOCK]
         elif self.fsm_state == "STANCE_LOCK":
             # 0.5초간 동시 수평화 보간 후 정적 안정 인터락 검증
             if self.state_timer >= 0.5:
@@ -655,18 +721,20 @@ class Tron1ControllerNode(Node):
                 if self.stable_timer >= self.vibration_hold_time_s:
                     self.fsm_state = "READY_FOR_PICK"
                     self.is_ready_for_pick = True
+                    self.has_docked = True  # 도킹 완료 플래그 기록
                     self.get_logger().info("★ [READY_FOR_PICK] 3초 정적 무진동 수평 확립! UR5e 피킹 권한을 승인합니다.")
 
-        # [FSM 상태 5: READY_FOR_PICK]
+        # [FSM 상태 6: READY_FOR_PICK]
         elif self.fsm_state == "READY_FOR_PICK":
             pass # cmd_undock 신호 대기
 
-        # [FSM 상태 6: UNDOCKING]
+        # [FSM 상태 7: UNDOCKING]
         elif self.fsm_state == "UNDOCKING":
             if self.state_timer >= 3.0:
-                self.fsm_state = "IN_PLACE_HOLD"
+                self.fsm_state = "WALKING"
                 self.state_timer = 0.0
-                self.get_logger().info(">> FSM: UNDOCKING 후진 완료 -> IN_PLACE_HOLD 안전 대기")
+                self.nav_phase = "RETURN_WALK"
+                self.get_logger().info(">> FSM: UNDOCKING 후진 완료 -> WALKING (원점 복귀 보행 개시)")
 
         # 관절 명령 발행 (임시 더미 또는 제어 계산치)
         cmd_msg = Float64MultiArray()
@@ -739,7 +807,8 @@ ros2 run tron1_locomotion tron1_controller
 [INFO] [tron1_controller]:   * 경유지 목록: [(-3.0, 3.0), (-0.7, 0.0), (0.27, 0.0)]
 [INFO] [tron1_controller]: === [Tron1Controller] 노드 구동 완료 (50Hz 제어 / 10Hz 상태 보고) ===
 [INFO] [tron1_controller]: >> FSM: LANDING -> IN_PLACE_HOLD
-[INFO] [tron1_controller]: >> FSM: IN_PLACE_HOLD -> DOCKING_APPROACH (내비게이션 개시)
+[INFO] [tron1_controller]: >> FSM: IN_PLACE_HOLD -> WALKING (경유지 자율 보행 개시)
+[INFO] [tron1_controller]: >> FSM: WALKING -> DOCKING_APPROACH (도킹 정렬 및 접근 개시)
 ```
 
 #### 7.3. 토픽 발행 및 인터락 에코 테스트 (Terminal 2)
@@ -809,6 +878,15 @@ ros2 topic pub --once /tron1/cmd_undock std_msgs/msg/Bool "{data: true}"
   ```bash
   cd Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws
   ros2 run tron1_locomotion tron1_controller --ros-args --params-file src/tron1_locomotion/config/tron1_params.yaml
+  ```
+
+### Q4. `colcon build` 시 `ModuleNotFoundError: No module named 'em'` 에러가 발생합니다.
+* **원인:** Conda 가상환경 내에 ROS 2 인터페이스 코드 변환용 파이썬 템플릿 엔진인 `empy`가 설치되어 있지 않기 때문입니다.
+* **조치법:**
+  ROS 2 Humble 호환을 위해 반드시 **3.x 버전(`empy==3.3.4`)**으로 설치해야 합니다 (최신 4.x 설치 시 API 불일치 오류 발생):
+  ```bash
+  conda activate transfer_bottle_by_tron1_py3_10
+  pip install "empy==3.3.4" lark
   ```
 
 ---

@@ -176,7 +176,7 @@ source /opt/ros/humble/setup.bash
 ### 6.4. Conda 가상환경 내 Python 핵심 라이브러리 설치
 ```bash
 python -m pip install --upgrade pip
-python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime
+python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy scipy transforms3d pyyaml matplotlib typeguard pydot onnxruntime "empy==3.3.4" lark
 ```
 
 #### 💡 Python 핵심 패키지(pip) 상세 역할 및 기능 요약
@@ -195,13 +195,25 @@ python -m pip install mujoco mujoco-python-viewer opencv-python open3d numpy sci
 | **`typeguard`** | 런타임 타입 검증 | ROS 2 파라미터 생성 라이브러리(`generate-parameter-library-py`) 의존성 충족 및 타입 안전성 보장 |
 | **`pydot`** | BT 시각화 | `py_trees` 내부의 트리 구조 시각화 및 DOT 그래프 렌더링 지원 (Conda 격리 환경 필수 의존성) |
 | **`onnxruntime`** | 기계학습 추론 | LimX Dynamics 공식 사전 훈련 강화학습 정책(policy.onnx, encoder.onnx)을 CPU에서 500Hz로 실시간 추론하여 Tron1 제자리 발구름 및 균형 제어 |
+| **`empy==3.3.4`** | 코드 생성기 | ROS 2 커스텀 인터페이스(`.msg`, `.srv`) 빌드 시 C++/Python 코드를 생성하는 템플릿 엔진 (`rosidl_adapter` 필수 의존성, 3.x 버전 고정) |
+| **`lark`** | 구문 분석 | ROS 2 IDL 인터페이스 정의 파서 및 문법 분석 엔진 |
+
+> **[중요] `empy` 패키지 버전 고정(`==3.3.4` 또는 `<4`)의 필요성 및 배경:**
+> 
+> * **왜 최신 `empy 4.x`를 쓰면 안 되는가?:**  
+>   `pip install empy`를 버전 지정 없이 실행하면 최신 `4.x` 버전이 설치됩니다. 그러나 ROS 2 Humble의 메시지 변환기(`rosidl_adapter`)는 3.x API 기준으로 작성되어 있어, 4.x 설치 시 `AttributeError: module 'em' has no attribute 'RAW_OPT'` 등의 비호환 에러가 발생하여 메시지 빌드가 실패합니다.
+> * **왜 하필 `3.3.4` 버전인가?:**  
+>   1. `empy` 3.x 계열은 2014년에 릴리스된 `3.3.4`가 최종 안정화 버전이며, 이후 수년간 3.x의 추가 릴리스 없이 2023년 말 4.0으로 넘어갔습니다. 즉, `empy<4`로 설치하더라도 실질적으로 설치되는 최신 버전은 `3.3.4`뿐입니다.
+>   2. Ubuntu 22.04 공식 apt 패키지(`python3-empy`) 역시 정확히 `3.3.4` 버전이므로, 가상환경에서도 `empy==3.3.4`를 고정(Pinning)할 때 시스템 및 ROS 2 Humble과의 완벽한 호환성이 보장됩니다.
+> * **pip 버전 표기 주의사항:**  
+>   `pip install "empy==3"`처럼 작성하면 버전명이 정확히 '3'인 릴리스를 찾으려다 `No matching distribution` 에러가 발생하므로, 반드시 **`"empy==3.3.4"`** 또는 **`"empy<4"`**로 지정해야 합니다.
 
 ---
 
 ### 6.5. 정상 연동 검증
 가상환경 활성화 및 ROS 2 소싱 상태에서 아래 명령어로 주요 패키지의 정상 임포트 여부를 1차 확인합니다:
 ```bash
-python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
+python -c 'import rclpy; import mujoco; import open3d; import cv2; import tf2_ros; import py_trees; import typeguard; import pydot; import onnxruntime; import em; import lark; print("✅ transfer_bottle_by_tron1_py3_10 핵심 환경 구성 완료!")'
 ```
 *(보다 심층적인 CXXABI 심볼 진단 및 오프스크린 렌더링 검사는 Phase 00의 `scripts_devel_roadmap/phase00_check_env.py`를 통해 진행합니다.)*
 

@@ -149,7 +149,7 @@ flowchart TD
 
 ### 3. 실습 및 구현 단계
 1. **인터페이스 패키지 (`ros2_ws/src/tron1_interfaces`):**
-   * `msg/Tron1Status.msg` 정의 (fsm_state, is_ready_for_pick, is_stance_locked, roll_deg, pitch_deg, bumper_force).
+   * `msg/Tron1Status.msg` 정의 (fsm_state[7대 상태], is_ready_for_pick, is_stance_locked, roll_deg, pitch_deg, bumper_force).
    * CMakeLists.txt 및 package.xml 빌드 설정.
 2. **제어기 패키지 (`ros2_ws/src/tron1_locomotion`):**
    * U02 FSM 코드를 ROS 2 노드(`tron1_controller.py`)로 래핑.
@@ -295,7 +295,7 @@ flowchart TD
 | :---: | :--- | :--- | :--- |
 | **Phase 00** | Conda & ROS 2 Humble 런타임 바인딩 검증 | `documents/development_roadmap/rm_phase00_runtime_binding.md` | `scripts_devel_roadmap/phase00_check_env.py` |
 | **Phase 01** | **Tron1 자율 보행 및 정밀 도킹 물리 검증**<br>• U00: 공통 환경 & 모델 로더<br>• U01: Tron1 RL 제자리 발구름 & 원점 유지<br>• U02: 트레이 적재 운반, 발 5cm 후퇴 3점 지지, 동시 수평화, 0.000mm 클램프, 74cm 테이블 & 58cm 드롭 브래킷 | `documents/development_roadmap/rm_phase01_u00_sandbox_env.md`<br>`documents/development_roadmap/rm_phase01_u01_tron1_walking.md`<br>`documents/development_roadmap/rm_phase01_u02_tron1_payload_transport.md` | `xml_for_unit_test/phase01_u00`~`u02.xml`<br>`scripts_devel_roadmap/phase01_u00`~`u02.py`<br>`documents/study/phase01_u02_issue_01`~`07.md` (7종) |
-| **Phase 02** | **Tron1 ROS 2 인터페이스 패키지 및 FSM 제어기 노드 구축**<br>• `tron1_interfaces` (Tron1Status.msg)<br>• `tron1_locomotion` (FSM 제어기 노드, `config/tron1_params.yaml` 파라미터 분리, `/tron1/status` 및 `/tron1/cmd_undock` 바인딩) | `documents/development_roadmap/rm_phase02_tron1_ros2_controller.md`<br>`documents/development_roadmap/rm_tron1_fsm_state_machine_spec.md` | `ros2_ws/src/tron1_interfaces/`<br>`ros2_ws/src/tron1_locomotion/` |
+| **Phase 02** | **Tron1 ROS 2 인터페이스 패키지 및 FSM 제어기 노드 구축**<br>• `tron1_interfaces` (Tron1Status.msg: 7대 FSM 상태 정의)<br>• `tron1_locomotion` (FSM 제어기 노드, `config/tron1_params.yaml` 파라미터 분리, `/tron1/status` 및 `/tron1/cmd_undock` 바인딩) | `documents/development_roadmap/rm_phase02_tron1_ros2_controller.md`<br>`documents/development_roadmap/rm_tron1_fsm_state_machine_spec.md` | `ros2_ws/src/tron1_interfaces/`<br>`ros2_ws/src/tron1_locomotion/` |
 | **Phase 03** | **U02 씬 기반 ROS 2 - MuJoCo 시뮬레이션 통신 브리지 구축**<br>• 로봇팔 없이 U02 씬 1:1 통신 바인딩<br>• Site 기반 물병 자동 동기화 및 슬롯 마스킹 (`bottle_slots`)<br>• 500Hz 물리 루프 ↔ ROS 2 토픽/액션 바인딩 | `documents/development_roadmap/rm_phase03_ros2_mujoco_bridge_tron1.md` | `ros2_ws/src/sim_bridge/`<br>`ros2_ws/src/sim_bridge/mujoco_ros_bridge.py` |
 | **Phase 04** | **ROS 2 환경 기반 Tron1 자율 도킹 및 토픽 발행 엔드-투-엔드 검증**<br>• [Tron1 노드 ↔ ROS 2 브리지 ↔ MuJoCo] 단독 가동<br>• 도킹 안착 후 `/tron1/status: READY_FOR_PICK` 발행 실시간 확인 | `documents/development_roadmap/rm_phase04_tron1_ros2_docking_verification.md` | `launch/tron1_sim_bringup.launch.py` |
 | **Phase 05** | **로봇팔(UR5e + 2F-85 + D435i) 통합 씬 확장 및 통신 바인딩**<br>• 74cm 표준 작업대 위 UR5e + 2F-85 + D435i 결합 (`scene_integrated.xml`)<br>• 로봇팔 관절 및 D435i 카메라 RGB-D 영상 통신 브리지 확장 | `documents/development_roadmap/rm_phase05_integrated_scene_and_arm_bridge.md` | `models/scene_integrated.xml`<br>`scripts_devel_roadmap/view_integrated_scene.py` |
