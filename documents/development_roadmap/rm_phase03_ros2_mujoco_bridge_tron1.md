@@ -1,8 +1,8 @@
 # [Phase 03 Guide] U02 씬 기반 ROS 2 - MuJoCo 시뮬레이션 통신 브리지 구축
 # (ROS 2 - MuJoCo Native Simulation Bridge Architecture: sim_bridge)
 
-* **문서 버전:** v1.1
-* **작성일:** 2026-09-17
+* **문서 버전:** v1.2
+* **작성일:** 2026-09-18
 * **프로젝트:** `Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env`
 * **대상 환경:** Ubuntu 22.04 LTS / ROS 2 Humble / MuJoCo 3.12.0 / Conda (`transfer_bottle_by_tron1_py3_10`)
 * **문서 목적:** 
@@ -23,21 +23,22 @@
    * [2.6. MuJoCo 패시브 뷰어(Passive Viewer) 메인 스레드 렌더링 원리](#26-mujoco-패시브-뷰어passive-viewer-메인-스레드-렌더링-원리)
 3. [전체 통신 데이터 흐름도 (Data Flow Architecture)](#3-전체-통신-데이터-흐름도-data-flow-architecture)
 4. [단계별 실습 (Step-by-Step Hands-on Guide)](#4-단계별-실습-step-by-step-hands-on-guide)
-   * [Step 1: 브리지 패키지 (`sim_bridge`) 생성 및 설정](#step-1-브리지-패키지-sim_bridge-생성-및-설정)
-     * [방법 A (권장): `ros2 pkg create` 명령어로 원샷 자동 생성](#방법-a-권장-ros2-pkg-create-명령어로-원샷-자동-생성)
+   * [Step 1: 브리지 패키지 (`sim_bridge`) 뼈대 생성](#step-1-브리지-패키지-sim_bridge-뼈대-생성)
+     * [방법 A (권장): `ros2 pkg create` 명령어로 패키지 자동 생성](#방법-a-권장-ros2-pkg-create-명령어로-패키지-자동-생성)
      * [방법 B (학습용): 디렉토리 및 필수 파일 수동 생성 (내부 구조 이해)](#방법-b-학습용-디렉토리-및-필수-파일-수동-생성-내부-구조-이해)
-   * [Step 2: 브리지 핵심 노드 (`mujoco_ros_bridge.py`) 구현](#step-2-브리지-핵심-노드-mujoco_ros_bridgepy-구현)
+   * [Step 2: 브리지 핵심 노드 (`mujoco_ros_bridge.py`) 파일 생성 및 소스 구현](#step-2-브리지-핵심-노드-mujoco_ros_bridgepy-파일-생성-및-소스-구현)
      * [2.1. 클래스 구조 및 초기화 흐름](#21-클래스-구조-및-초기화-흐름)
      * [2.2. Site 기반 물병 동기화 알고리즘 구현](#22-site-기반-물병-동기화-알고리즘-구현)
      * [2.3. 500Hz 물리 적분 스레드 및 센서 퍼블리시 구현](#23-500hz-물리-적분-스레드-및-센서-퍼블리시-구현)
      * [2.4. 액추에이터 구동 명령 서브스크라이버 구현](#24-액추에이터-구동-명령-서브스크라이버-구현)
      * [2.5. 메인 GUI 렌더링 루프 통합](#25-메인-gui-렌더링-루프-통합)
-   * [Step 3: 패키지 빌드 및 환경 로드](#step-3-패키지-빌드-및-환경-로드)
-   * [Step 4: 단독 브리지 구동 및 ROS 2 토픽 정밀 검증](#step-4-단독-브리지-구동-및-ros-2-토픽-정밀-검증)
-     * [4.1. 브리지 노드 실행 (Terminal 1)](#41-브리지-노드-실행-terminal-1)
-     * [4.2. 토픽 목록 및 발행 주기 확인 (Terminal 2)](#42-토픽-목록-및-발행-주기-확인-terminal-2)
-     * [4.3. `/clock` 및 센서 토픽 내용 확인 (Terminal 2)](#43-clock-및-센서-토픽-내용-확인-terminal-2)
-     * [4.4. 수동 관절 명령 주입 및 로봇 거동 확인 (Terminal 2)](#44-수동-관절-명령-주입-및-로봇-거동-확인-terminal-2)
+   * [Step 3: `setup.py`에 실행 진입점(Entry Point) 직접 등록](#step-3-setuppy에-실행-진입점entry-point-직접-등록)
+   * [Step 4: 패키지 빌드 및 환경 로드](#step-4-패키지-빌드-및-환경-로드)
+   * [Step 5: 단독 브리지 구동 및 ROS 2 토픽 정밀 검증](#step-5-단독-브리지-구동-및-ros-2-토픽-정밀-검증)
+     * [5.1. 브리지 노드 실행 (Terminal 1)](#51-브리지-노드-실행-terminal-1)
+     * [5.2. 토픽 목록 및 발행 주기 확인 (Terminal 2)](#52-토픽-목록-및-발행-주기-확인-terminal-2)
+     * [5.3. `/clock` 및 센서 토픽 내용 확인 (Terminal 2)](#53-clock-및-센서-토픽-내용-확인-terminal-2)
+     * [5.4. 수동 관절 명령 주입 및 로봇 거동 확인 (Terminal 2)](#54-수동-관절-명령-주입-및-로봇-거동-확인-terminal-2)
 5. [트러블슈팅 및 성능 최적화 가이드](#5-트러블슈팅-및-성능-최적화-가이드)
 6. [Phase 03 완성 체크리스트](#6-phase-03-완성-체크리스트)
 
@@ -216,15 +217,15 @@ flowchart TD
 
 이제 터미널을 열고 직접 따라하며 `sim_bridge` 패키지를 제작해 보겠습니다.
 
-### Step 1: 브리지 패키지 (`sim_bridge`) 생성 및 설정
+### Step 1: 브리지 패키지 (`sim_bridge`) 뼈대 생성
 
-패키지를 생성하는 방법은 **CLI 명령어로 한 번에 생성하는 [방법 A (권장)]**와, **ROS 2 패키지 내부 구조를 직접 확인하며 만드는 [방법 B (학습용)]** 중 원하는 방식을 선택할 수 있습니다.
+패키지 뼈대를 생성하는 방법은 **CLI 명령어로 한 번에 생성하는 [방법 A (권장)]**와, **ROS 2 패키지 내부 구조를 직접 확인하며 만드는 [방법 B (학습용)]** 중 원하는 방식을 선택할 수 있습니다.
 
 ---
 
-#### 🔹 방법 A (권장): `ros2 pkg create` 명령어로 원샷 자동 생성
+#### 🔹 방법 A (권장): `ros2 pkg create` 명령어로 패키지 자동 생성
 
-터미널에서 아래 명령어를 실행하면 디렉토리 구조, 의존성 선언(`package.xml`), 실행 진입점 등록(`setup.py`), 패키지 리소스 파일이 한 번에 자동으로 생성됩니다.
+터미널에서 아래 명령어를 실행하면 디렉토리 구조, 의존성 선언(`package.xml`), `setup.py` 템플릿, 패키지 리소스 파일이 한 번에 자동으로 생성됩니다.
 
 ```bash
 # 1. Conda 가상환경 활성화 및 ROS 2 소싱
@@ -234,17 +235,18 @@ source /opt/ros/humble/setup.bash
 # 2. 워크스페이스 src 폴더로 이동
 cd .../Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws/src
 
-# 3. sim_bridge 패키지 원샷 생성 (6대 의존성 및 노드 실행 파일명 자동 지정)
+# 3. sim_bridge 패키지 뼈대 생성 (6대 의존성 및 설명 지정)
 ros2 pkg create --build-type ament_python sim_bridge \
   --dependencies rclpy rosgraph_msgs sensor_msgs geometry_msgs std_msgs tron1_interfaces \
-  --node-name mujoco_ros_bridge \
+  --description "MuJoCo Physics Simulation ROS 2 Bridge for Tron1 Payload Transport" \
   --maintainer-name "tae" \
   --maintainer-email "tae@todo.todo" \
   --license "Apache-2.0"
 ```
 
-> [!TIP]
-> 방법 A를 실행하면 `sim_bridge/sim_bridge/mujoco_ros_bridge.py` 기본 뼈대 파일까지 자동 생성되므로, 곧바로 **Step 2(소스 코드 구현)**로 넘어가서 해당 파일에 브리지 코드를 작성하시면 됩니다!
+* **💡 `--node-name`을 생략한 이유:**
+  * 특정 노드 이름을 자동으로 생성하지 않고, 패키지 기본 뼈대만 깔끔하게 구성하기 위함입니다.
+  * 소스 파일(`mujoco_ros_bridge.py`)은 **Step 2**에서 직접 생성하고, 실행 진입점 등록은 **Step 3**에서 `setup.py`를 열어 직접 등록하는 정석적인 워크플로우로 진행합니다.
 
 ---
 
@@ -275,8 +277,7 @@ sim_bridge/
 ├── resource/
 │   └── sim_bridge       # [인덱스 마커] ROS 2가 패키지를 인식하기 위한 0바이트 마커
 └── sim_bridge/
-    ├── __init__.py      # [파이썬 선언] 파이썬 모듈 네임스페이스 선언
-    └── mujoco_ros_bridge.py # [메인 소스] MuJoCo 시뮬레이션 브리지 노드 코드
+    └── __init__.py      # [파이썬 선언] 파이썬 모듈 네임스페이스 선언
 ```
 
 ---
@@ -345,9 +346,7 @@ install_scripts=$base/lib/sim_bridge
 
 ---
 
-##### 4) `sim_bridge/setup.py` 작성 및 코드 분석:
-
-`setup.py`는 패키지의 빌드/배포 스크립트이며, **비-파이썬 데이터 파일(리소스, 설정)의 복사 규칙과 터미널 명령어 진입점(Entry Point)**을 정의합니다.
+##### 4) `sim_bridge/setup.py` 기본 뼈대 작성:
 
 ```python
 from setuptools import find_packages, setup
@@ -357,18 +356,12 @@ package_name = 'sim_bridge'
 setup(
     name=package_name,
     version='1.0.0',
-    # 1. sim_bridge 폴더 내의 파이썬 패키지를 자동 탐색 (test 폴더 제외)
     packages=find_packages(exclude=['test']),
-
-    # 2. 파이썬 소스 외에 설치 디렉토리(install/)로 복사할 비-코드 데이터 파일 명시
     data_files=[
-        # Ament 인덱스에 패키지를 등록하기 위해 resource 마커 파일을 share 경로로 복사
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
-        # 패키지 메타데이터인 package.xml을 share 경로로 복사
         ('share/' + package_name, ['package.xml']),
     ],
-
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='tae',
@@ -376,29 +369,25 @@ setup(
     description='MuJoCo Physics Simulation ROS 2 Bridge for Tron1 Payload Transport',
     license='Apache-2.0',
     tests_require=['pytest'],
-
-    # 3. 콘솔 실행 진입점 (ros2 run 명령어가 호출할 함수 매핑)
     entry_points={
         'console_scripts': [
-            # [실행명령어] = [패키지모듈].[파일명]:[호출할 함수명]
-            'sim_bridge = sim_bridge.mujoco_ros_bridge:main',
+            # Step 3에서 실행 진입점을 직접 등록합니다.
         ],
     },
 )
 ```
 
-* **💡 `setup.py` 핵심 코드 상세 분석:**
-  * `data_files`:
-    * `('share/ament_index/resource_index/packages', ['resource/' + package_name])`: Step 1에서 생성했던 빈 마커 파일(`resource/sim_bridge`)을 ROS 2 공식 공유 디렉토리로 복사합니다. 이 라인이 빠지면 `colcon build`가 성공하더라도 `ros2 pkg list`나 `ros2 run`에서 패키지를 찾지 못하는 치명적인 오류(`Package 'sim_bridge' not found`)가 발생합니다.
-    * `('share/' + package_name, ['package.xml'])`: `package.xml`도 함께 설치 디렉토리로 복사하여 런타임에 ROS 2가 패키지 버전 및 의존성을 추적할 수 있게 합니다.
-  * `entry_points={'console_scripts': [...]}`:
-    * `'sim_bridge = sim_bridge.mujoco_ros_bridge:main'`: 사용자가 터미널에 `ros2 run sim_bridge sim_bridge`를 입력했을 때, ROS 2가 `sim_bridge/mujoco_ros_bridge.py` 파일 안에 선언된 `main()` 함수를 찾아 자동으로 실행하도록 연결해 주는 **가장 핵심적인 실행 스위치**입니다.
-
 ---
 
-### Step 2: 브리지 핵심 노드 (`mujoco_ros_bridge.py`) 구현
+### Step 2: 브리지 핵심 노드 (`mujoco_ros_bridge.py`) 파일 생성 및 소스 구현
 
-이제 브리지의 핵심 코드를 작성합니다. 파일 경로는 `ros2_ws/src/sim_bridge/sim_bridge/mujoco_ros_bridge.py`입니다.
+이제 브리지의 핵심 코드를 작성합니다. 먼저 소스 파일을 생성합니다:
+
+```bash
+touch .../Proj_Transferring_bottle_from_tron1_to_ur5e_in_mujoco_env/ros2_ws/src/sim_bridge/sim_bridge/mujoco_ros_bridge.py
+```
+
+생성한 파일(`sim_bridge/sim_bridge/mujoco_ros_bridge.py`)을 열고 아래 소스 코드를 작성합니다.
 
 코드는 다음과 같은 5대 핵심 모듈로 구성됩니다:
 1. **파라미터 로드:** `spawn_pose`, `bottle_slots`, XML 파일 경로.
@@ -407,7 +396,7 @@ setup(
 4. **센서 데이터 토픽 퍼블리시:** `/clock`, `/joint_states`, `/tron1/imu`, `/tron1/bumper_wrench`.
 5. **메인 렌더링 루프:** `mujoco.viewer.launch_passive`.
 
-#### 💡 전체 소스 코드 구현 (`mujoco_ros_bridge.py`):
+#### 💡 전체 소스 코드 (`mujoco_ros_bridge.py`):
 
 ```python
 #!/usr/bin/env python3
@@ -714,7 +703,57 @@ if __name__ == '__main__':
 
 ---
 
-### Step 3: 패키지 빌드 및 환경 로드
+### Step 3: `setup.py`에 실행 진입점(Entry Point) 직접 등록
+
+`ros2_ws/src/sim_bridge/setup.py` 파일을 열고, Step 2에서 작성한 `mujoco_ros_bridge.py`의 `main()` 함수를 터미널에서 `sim_bridge`라는 명령어로 실행할 수 있도록 `entry_points` 항목에 직접 등록합니다.
+
+```python
+    entry_points={
+        'console_scripts': [
+            # [실행명령어] = [패키지폴더명].[파이썬파일명]:[호출할함수명]
+            'sim_bridge = sim_bridge.mujoco_ros_bridge:main',
+        ],
+    },
+```
+
+#### 💡 전체 완성된 `sim_bridge/setup.py` 코드:
+
+```python
+from setuptools import find_packages, setup
+
+package_name = 'sim_bridge'
+
+setup(
+    name=package_name,
+    version='1.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='tae',
+    maintainer_email='tae@todo.todo',
+    description='MuJoCo Physics Simulation ROS 2 Bridge for Tron1 Payload Transport',
+    license='Apache-2.0',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'sim_bridge = sim_bridge.mujoco_ros_bridge:main',
+        ],
+    },
+)
+```
+
+* **💡 `entry_points` 등록의 핵심 원리:**
+  * 이 설정이 완료되어야 추후 `colcon build` 시 ROS 2 빌드 시스템이 `sim_bridge`라는 실행 스크립트를 생성하고, 사용자가 터미널에서 **`ros2 run sim_bridge sim_bridge`** 명령어를 입력했을 때 해당 코드를 찾아 실행할 수 있게 됩니다.
+  * 추후 패키지에 새로운 노드(예: `sim_monitor.py`)를 추가할 때도 `console_scripts` 리스트 안에 `'sim_monitor = sim_bridge.sim_monitor:main'`과 같이 한 줄씩 추가해 주면 됩니다.
+
+---
+
+### Step 4: 패키지 빌드 및 환경 로드
 
 `colcon build` 명령을 사용하여 새로 작성한 `sim_bridge` 패키지를 컴파일하고 워크스페이스 환경을 오버레이합니다.
 
@@ -734,11 +773,11 @@ source install/setup.bash
 
 ---
 
-### Step 4: 단독 브리지 구동 및 ROS 2 토픽 정밀 검증
+### Step 5: 단독 브리지 구동 및 ROS 2 토픽 정밀 검증
 
 이제 터미널을 여러 개 열어 `sim_bridge`가 단독으로 정상 작동하는지, 시뮬레이션 데이터가 토픽으로 올바르게 발행되는지 검증합니다.
 
-#### 4.1. 브리지 노드 실행 (Terminal 1)
+#### 5.1. 브리지 노드 실행 (Terminal 1)
 
 ```bash
 conda activate transfer_bottle_by_tron1_py3_10
@@ -757,7 +796,7 @@ ros2 run sim_bridge sim_bridge
 
 ---
 
-#### 4.2. 토픽 목록 및 발행 주기 확인 (Terminal 2)
+#### 5.2. 토픽 목록 및 발행 주기 확인 (Terminal 2)
 
 새 터미널을 열고 토픽 목록을 조회합니다:
 
@@ -792,7 +831,7 @@ ros2 topic hz /joint_states
 
 ---
 
-#### 4.3. `/clock` 및 센서 토픽 내용 확인 (Terminal 2)
+#### 5.3. `/clock` 및 센서 토픽 내용 확인 (Terminal 2)
 
 ```bash
 # /clock 토픽 에코
@@ -826,7 +865,7 @@ position:
 
 ---
 
-#### 4.4. 수동 관절 명령 주입 및 로봇 거동 확인 (Terminal 2)
+#### 5.4. 수동 관절 명령 주입 및 로봇 거동 확인 (Terminal 2)
 
 제어기 없이도 브리지가 명령을 정상 수신하는지 확인하기 위해, 터미널에서 6개 관절에 수동 토크 명령을 발행해 봅니다:
 
